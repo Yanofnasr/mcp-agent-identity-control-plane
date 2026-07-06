@@ -1,0 +1,126 @@
+digraph FourPrincipalControlPlane {
+  graph [
+    rankdir=TB,
+    bgcolor="white",
+    pad="0.42",
+    nodesep="0.36",
+    ranksep="0.58",
+    splines=polyline,
+    fontname="Helvetica",
+    fontsize=23,
+    labelloc="t",
+    label="The Four-Principal Agent Identity Control Plane"
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    color="#344054",
+    penwidth=1.3,
+    fontcolor="#101828",
+    fillcolor="#F8FAFC",
+    fontname="Helvetica",
+    fontsize=12,
+    margin="0.22,0.15"
+  ];
+
+  edge [
+    color="#475467",
+    fontcolor="#344054",
+    fontname="Helvetica",
+    fontsize=10,
+    arrowsize=0.78,
+    penwidth=1.18
+  ];
+
+  thesis [
+    shape=note,
+    label="Authentication proves who connected. The control plane must preserve\nwho requested, whose authority was used, which agent acted,\nand which identity reached the target.",
+    fillcolor="#FFFFFF",
+    color="#98A2B3",
+    fontcolor="#344054",
+    fontsize=11.5
+  ];
+
+  p1 [label="P1  REQUESTING PRINCIPAL\nWho initiated the task?", fillcolor="#EAF2FF"];
+  p2 [label="P2  AUTHORITY SUBJECT\nWhose authority or data is exercised?", fillcolor="#EAF2FF"];
+  p3 [label="P3  AGENT PRINCIPAL\nWhich autonomous workload acted?", fillcolor="#EAF7F0"];
+
+  issuer [
+    label="IDENTITY PROVIDER + WORKLOAD ISSUER\nValidate requester and agent credentials",
+    fillcolor="#EEF4FF"
+  ];
+
+  ingress [
+    label="INGRESS POLICY ENFORCEMENT POINT\nResolve principals • normalize target and arguments\ncompute action hash • classify environment",
+    fillcolor="#FFF5E6"
+  ];
+
+  trusted [
+    shape=folder,
+    label="TRUSTED CONTROL DATA\nSigned policy bundle • entitlements • issuer rules\ntarget-audience mapping • authoritative approval record",
+    fillcolor="#F3F0FF"
+  ];
+
+  pdp [
+    label="POLICY DECISION POINT\nTool + target + authority mode + risk + approval + trusted time",
+    fillcolor="#FFF0F0"
+  ];
+
+  broker [
+    label="CREDENTIAL BROKER / STS\nIssue short-lived, target-bound, sender-constrained authority",
+    fillcolor="#EEF4FF"
+  ];
+
+  p4 [
+    label="P4  EXECUTION PRINCIPAL\nWhich identity will the target authorize?",
+    fillcolor="#EAF7F0"
+  ];
+
+  finalpep [
+    label="MCP GATEWAY: FINAL ENFORCEMENT\nValidate the issued credential and exact target audience\nrecheck approval and unchanged action • allow or deny",
+    fillcolor="#F2EDFF"
+  ];
+
+  resource [
+    label="TARGET RESOURCE\nExecute only the authorized operation",
+    fillcolor="#F8FAFC"
+  ];
+
+  audit [
+    shape=cylinder,
+    label="CORRELATED, TAMPER-EVIDENT AUDIT EVENT\nP1 + P2 + P3 + P4 • policy • approval • action hash • result",
+    fillcolor="#F4F4F4",
+    margin="0.26,0.17"
+  ];
+
+  boundary [
+    shape=note,
+    label="TRUST BOUNDARY\nThe agent may propose an action and reference an approval ID.\nIt may not assert verified identity, entitlement, approval state,\naudience, issuer, or evaluation time.",
+    fillcolor="#FFFFFF",
+    color="#98A2B3",
+    fontcolor="#475467",
+    fontsize=10.5
+  ];
+
+  { rank=same; p1; p2; p3; }
+  { rank=same; trusted; pdp; }
+
+  thesis -> p2 [style=invis];
+  p1 -> p2 [style=invis, weight=100];
+  p2 -> p3 [style=invis, weight=100];
+
+  p1 -> issuer [label="authenticate"];
+  p3 -> issuer [label="workload proof"];
+  issuer -> ingress [label="verified identity claims"];
+  p2 -> ingress [label="bounded authority context"];
+
+  ingress -> pdp [label="pre-issuance decision"];
+  trusted -> pdp [label="trusted facts", style=dashed];
+  pdp -> broker [label="credential contract"];
+  broker -> p4 [label="bounded credential"];
+  p4 -> finalpep [label="actual issued credential"];
+  finalpep -> resource [label="execute unchanged action"];
+  resource -> audit [label="result"];
+  audit -> boundary [style=invis];
+}

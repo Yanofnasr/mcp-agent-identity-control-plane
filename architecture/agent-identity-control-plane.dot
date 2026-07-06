@@ -1,0 +1,82 @@
+digraph AgentIdentityControlPlane {
+  graph [
+    rankdir=TB,
+    bgcolor="white",
+    pad="0.38",
+    nodesep="0.52",
+    ranksep="0.68",
+    splines=polyline,
+    fontname="Helvetica",
+    fontsize=21,
+    labelloc="t",
+    label="Agent Identity and Delegation Control Plane"
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#F8FAFC",
+    color="#344054",
+    penwidth=1.25,
+    fontcolor="#101828",
+    fontname="Helvetica",
+    fontsize=11,
+    margin="0.20,0.13"
+  ];
+
+  edge [
+    color="#475467",
+    fontcolor="#344054",
+    fontname="Helvetica",
+    fontsize=9.5,
+    arrowsize=0.74,
+    penwidth=1.15
+  ];
+
+  p1 [label="P1 REQUESTING PRINCIPAL\nHuman or invoking service", fillcolor="#EAF2FF"];
+  p2 [label="P2 AUTHORITY SUBJECT\nWhose authority or data is used", fillcolor="#EAF2FF"];
+  p3 [label="P3 AGENT PRINCIPAL\nAttested autonomous workload", fillcolor="#EAF7F0"];
+
+  issuer [label="IDENTITY PROVIDER + WORKLOAD ISSUER\nValidate requester and agent credentials", fillcolor="#EEF4FF"];
+  ingress [label="INGRESS PEP\nResolve principals • normalize action\ncompute hash • classify environment", fillcolor="#FFF5E6"];
+
+  trusted [shape=folder, label="TRUSTED POLICY DATA\nTools • entitlements • issuers\ntarget-audience bindings", fillcolor="#F3F0FF"];
+  pdp [label="POLICY DECISION POINT\nAuthority mode • tool • target • risk\napproval • trusted time", fillcolor="#FFF0F0"];
+  approvals [shape=folder, label="APPROVAL SERVICE\nVerified record bound to action, identities,\nenvironment and policy bundle", fillcolor="#F3F0FF"];
+
+  broker [label="CREDENTIAL BROKER / STS\nIssue bounded target authority", fillcolor="#EEF4FF"];
+  p4 [label="P4 EXECUTION PRINCIPAL\nIdentity authorized by the target", fillcolor="#EAF7F0"];
+
+  mcp [label="MCP GATEWAY: FINAL PEP\nValidate issued credential and exact audience\nrecheck approval and unchanged action", fillcolor="#F2EDFF"];
+  target [label="TARGET API / RESOURCE\nExecute only the authorized operation"];
+
+  audit [shape=cylinder, label="TAMPER-EVIDENT AUDIT EVENT\nP1 + P2 + P3 + P4 • policy • approval\naction hash • result", fillcolor="#F4F4F4", margin="0.24,0.15"];
+  note [shape=note, label="TRUST BOUNDARY\nThe agent proposes the action. It cannot assert verified identity, entitlement,\napproval state, audience, issuer, or time. The reference Rego policy\nevaluates the final gate after credential issuance.", fillcolor="#FFFFFF", color="#98A2B3", fontcolor="#475467", fontsize=9.5];
+
+  { rank=same; p1; p2; p3; }
+  { rank=same; issuer; ingress; }
+  { rank=same; trusted; pdp; approvals; }
+  { rank=same; broker; p4; }
+  { rank=same; mcp; target; }
+  { rank=same; note; audit; }
+
+  p1 -> p2 [style=invis, weight=100];
+  p2 -> p3 [style=invis, weight=100];
+  trusted -> pdp [style=dashed, label="controlled facts"];
+  approvals -> pdp [style=dashed, label="authoritative record"];
+
+  p1 -> issuer [label="1. authenticate"];
+  p3 -> issuer [label="2. workload proof"];
+  issuer -> ingress [label="3. verified identity claims"];
+  p2 -> ingress [label="authority context"];
+  p3 -> ingress [label="proposed action"];
+
+  ingress -> pdp [label="4. pre-issuance decision"];
+  pdp -> broker [label="5. credential contract"];
+  broker -> p4 [label="6. short-lived target credential"];
+  p4 -> mcp [label="7. issued credential"];
+  ingress -> mcp [label="canonical action + correlation", constraint=false];
+  mcp -> target [label="8. execute unchanged action"];
+  target -> audit [label="9. result"];
+  note -> audit [style=invis];
+}

@@ -1,0 +1,104 @@
+{
+  "agent_control": {
+    "policy_id": "urn:example:policy:mcp-agent-tool-authorization",
+    "policy_version": "1.1.0",
+    "servers": {
+      "source-control": {
+        "allowed_methods": [
+          "tools/call"
+        ],
+        "trusted_issuers": [
+          "https://idp.example.internal/realms/enterprise"
+        ],
+        "allowed_sender_constraints": [
+          "dpop",
+          "mtls",
+          "platform_bound"
+        ],
+        "audience_bindings": [
+          {
+            "target_pattern": "scm://platform/*",
+            "audience": "https://source-control.example.internal"
+          }
+        ],
+        "tools": {
+          "get_file": {
+            "write": false,
+            "requires_approval": false,
+            "approval_mode": "none",
+            "risk_tier": "low",
+            "max_credential_ttl_seconds": 300,
+            "credential_profiles": {
+              "agent_own": "source-control-agent-read-only",
+              "user_delegated": "source-control-user-delegated-read-only",
+              "brokered_service": "source-control-brokered-read-only"
+            }
+          },
+          "search_code": {
+            "write": false,
+            "requires_approval": false,
+            "approval_mode": "none",
+            "risk_tier": "low",
+            "max_credential_ttl_seconds": 300,
+            "credential_profiles": {
+              "agent_own": "source-control-agent-read-only",
+              "user_delegated": "source-control-user-delegated-read-only",
+              "brokered_service": "source-control-brokered-read-only"
+            }
+          },
+          "create_pull_request": {
+            "write": true,
+            "requires_approval": true,
+            "approval_mode": "confirmation",
+            "risk_tier": "high",
+            "max_credential_ttl_seconds": 600,
+            "credential_profiles": {
+              "user_delegated": "source-control-user-delegated-write",
+              "brokered_service": "source-control-brokered-write"
+            }
+          },
+          "merge_pull_request": {
+            "write": true,
+            "requires_approval": true,
+            "approval_mode": "independent",
+            "risk_tier": "critical",
+            "max_credential_ttl_seconds": 900,
+            "credential_profiles": {
+              "user_delegated": "source-control-user-delegated-critical",
+              "brokered_service": "source-control-brokered-critical"
+            }
+          }
+        }
+      }
+    },
+    "entitlements": {
+      "spiffe://agents.example.internal/prod/release-agent": {
+        "allowed_environments": [
+          "staging",
+          "production"
+        ],
+        "allowed_authority_modes": [
+          "user_delegated",
+          "brokered_service"
+        ],
+        "allowed_execution_principals": [
+          "urn:example:workload:release-broker-prod"
+        ],
+        "server_permissions": {
+          "source-control": {
+            "allowed_tools": [
+              "get_file",
+              "search_code",
+              "create_pull_request",
+              "merge_pull_request"
+            ],
+            "allowed_targets": [
+              "scm://platform/*"
+            ],
+            "production_write_allowed": true
+          }
+        }
+      }
+    }
+  }
+}

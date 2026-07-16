@@ -1,0 +1,16 @@
+{
+  "approval_records": {
+    "approval_01J8Y4Q63H": {
+      "status": "approved",
+      "action_hash": "sha256:3c2411af1c56c81064e144686779398c89bc0658cec3ea70ce74730173787d7d",
+      "requester_principal_id": "urn:example:principal:requester:01J8Y4K6V9",
+      "authority_subject_principal_id": "urn:example:principal:subject:01J8Y4K6V9",
+      "agent_principal": "spiffe://agents.example.internal/prod/release-agent",
+      "environment": "production",
+      "policy_bundle_digest": "sha256:2809889244eaf9c73f0fd4e38c805401d22ee8a7ee9bcf5adb43149b41e162cd",
+      "approver_principal_id": "urn:example:principal:approver:01J8Y4V1F7",
+      "approved_at": "2026-07-28T12:15:00Z",
+      "expires_at": "2026-07-28T12:30:00Z"
+    }
+  }
+}

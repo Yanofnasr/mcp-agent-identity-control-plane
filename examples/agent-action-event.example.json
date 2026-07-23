@@ -1,0 +1,99 @@
+{
+  "schema_version": "1.1",
+  "event_id": "evt_01J8Y4T3T5M1A4FGKMGQ2Q6J7D",
+  "occurred_at": "2026-07-28T12:20:04Z",
+  "requester": {
+    "principal_id": "urn:example:principal:requester:01J8Y4K6V9",
+    "principal_type": "human",
+    "tenant_id": "urn:example:tenant:primary"
+  },
+  "authority_subject": {
+    "principal_id": "urn:example:principal:subject:01J8Y4K6V9",
+    "principal_type": "human",
+    "authority_basis": "explicit_delegation",
+    "tenant_id": "urn:example:tenant:primary"
+  },
+  "agent": {
+    "agent_principal": "spiffe://agents.example.internal/prod/release-agent",
+    "agent_definition_id": "urn:example:agent:release-agent",
+    "agent_version": "sha256:3f86d5d90ca8c9f96ef467ad31eb5ea1f10df2d10fc88d8a4723334d3d9470bb",
+    "runtime_instance_id": "runtime_01J8Y4M8YF",
+    "mcp_client_id": "release-agent-prod",
+    "credential_thumbprint": "sha256:8100b67f025b63b963929c43b581b122c239e4d6d48daaa4ad06c2099f450f61",
+    "credential_verified": true
+  },
+  "execution": {
+    "authority_mode": "user_delegated",
+    "principal_id": "urn:example:workload:release-broker-prod",
+    "credential_type": "oauth_access_token",
+    "issuer": "https://idp.example.internal/realms/enterprise",
+    "audiences": [
+      "https://source-control.example.internal"
+    ],
+    "issued_at": "2026-07-28T12:20:00Z",
+    "not_before": "2026-07-28T12:19:55Z",
+    "expires_at": "2026-07-28T12:35:00Z",
+    "sender_constraint": "dpop",
+    "credential_thumbprint": "sha256:a940ac3f09ebc221baed35c15af260a34d0f6f4c6d320a3c78ef4f4865c58bb7",
+    "credential_verified": true,
+    "authority_subject_principal_id": "urn:example:principal:subject:01J8Y4K6V9",
+    "agent_actor_principal_id": "spiffe://agents.example.internal/prod/release-agent",
+    "delegation_verified": true
+  },
+  "action": {
+    "mcp_server": "source-control",
+    "method": "tools/call",
+    "tool": "merge_pull_request",
+    "target": "scm://platform/example-service/pull/482",
+    "arguments_digest": "sha256:53bdd5e4ad46d58adafed7a89380ea5663a23a3cc395cb0bfd3043e08539c04f",
+    "data_classification": "internal",
+    "canonical_hash": "sha256:3c2411af1c56c81064e144686779398c89bc0658cec3ea70ce74730173787d7d"
+  },
+  "context": {
+    "approval_id": "approval_01J8Y4Q63H",
+    "session_id": "session_01J8Y4NG5B",
+    "task_id": "task_01J8Y4P2TF",
+    "correlation_id": "corr_01J8Y4PAP7",
+    "environment": "production",
+    "policy_bundle_digest": "sha256:2809889244eaf9c73f0fd4e38c805401d22ee8a7ee9bcf5adb43149b41e162cd",
+    "prompt_context_hash": "sha256:9bd600959ae39f3098b9b61949f6661d21f398a0a7ef83f062b1c31ba0ee7b99"
+  },
+  "approval": {
+    "required": true,
+    "status": "approved",
+    "approval_id": "approval_01J8Y4Q63H",
+    "approver_principal_id": "urn:example:principal:approver:01J8Y4V1F7",
+    "action_hash": "sha256:3c2411af1c56c81064e144686779398c89bc0658cec3ea70ce74730173787d7d",
+    "approved_at": "2026-07-28T12:15:00Z",
+    "expires_at": "2026-07-28T12:30:00Z"
+  },
+  "decision": {
+    "outcome": "allow_with_approval",
+    "policy_id": "urn:example:policy:mcp-agent-tool-authorization",
+    "policy_version": "1.1.0",
+    "evaluated_at": "2026-07-28T12:20:02Z",
+    "reason_codes": [
+      "IDENTITY_CHAIN_VALID",
+      "ACTION_HASH_VALID",
+      "AUDIENCE_BOUND_TO_TARGET",
+      "TOOL_AND_TARGET_ALLOWED",
+      "APPROVAL_BOUND_TO_ACTION"
+    ],
+    "risk_tier": "critical",
+    "credential_profile": "source-control-user-delegated-critical",
+    "credential_ttl_seconds": 900
+  },
+  "result": {
+    "status": "success",
+    "target_event_id": "scm_audit_7483921",
+    "completed_at": "2026-07-28T12:20:04Z"
+  },
+  "evidence": {
+    "record_digest": "sha256:4279e4d6fcc5cbf9f8d0595767a532c9b94ad6f27bd7d4f6eb440fb6d41deab0",
+    "digest_profile": "canonical-json-sort-keys-v1",
+    "evidence_uri": "https://evidence.example.internal/events/evt_01J8Y4T3T5M1A4FGKMGQ2Q6J7D",
+    "retention_class": "security",
+    "contains_raw_credentials": false,
+    "contains_raw_prompt": false
+  }
+}

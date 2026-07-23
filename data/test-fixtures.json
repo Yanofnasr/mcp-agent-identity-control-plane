@@ -1,0 +1,64 @@
+{
+  "test_fixtures": {
+    "valid_input": {
+      "schema_version": "1.1",
+      "request": {
+        "approval_id": "approval_01J8Y4Q63H",
+        "session_id": "session_01J8Y4NG5B",
+        "task_id": "task_01J8Y4P2TF",
+        "correlation_id": "corr_01J8Y4PAP7"
+      },
+      "verified": {
+        "requester": {
+          "principal_id": "urn:example:principal:requester:01J8Y4K6V9",
+          "principal_type": "human"
+        },
+        "authority_subject": {
+          "principal_id": "urn:example:principal:subject:01J8Y4K6V9",
+          "principal_type": "human",
+          "authority_basis": "explicit_delegation"
+        },
+        "agent": {
+          "agent_principal": "spiffe://agents.example.internal/prod/release-agent",
+          "agent_definition_id": "urn:example:agent:release-agent",
+          "agent_version": "sha256:3f86d5d90ca8c9f96ef467ad31eb5ea1f10df2d10fc88d8a4723334d3d9470bb",
+          "runtime_instance_id": "runtime_01J8Y4M8YF",
+          "mcp_client_id": "release-agent-prod",
+          "credential_thumbprint": "sha256:8100b67f025b63b963929c43b581b122c239e4d6d48daaa4ad06c2099f450f61",
+          "credential_verified": true
+        },
+        "execution": {
+          "authority_mode": "user_delegated",
+          "principal_id": "urn:example:workload:release-broker-prod",
+          "credential_type": "oauth_access_token",
+          "issuer": "https://idp.example.internal/realms/enterprise",
+          "audiences": [
+            "https://source-control.example.internal"
+          ],
+          "issued_at": "2026-07-28T12:20:00Z",
+          "not_before": "2026-07-28T12:19:55Z",
+          "expires_at": "2026-07-28T12:35:00Z",
+          "sender_constraint": "dpop",
+          "credential_thumbprint": "sha256:a940ac3f09ebc221baed35c15af260a34d0f6f4c6d320a3c78ef4f4865c58bb7",
+          "credential_verified": true,
+          "authority_subject_principal_id": "urn:example:principal:subject:01J8Y4K6V9",
+          "agent_actor_principal_id": "spiffe://agents.example.internal/prod/release-agent",
+          "delegation_verified": true
+        },
+        "action": {
+          "mcp_server": "source-control",
+          "method": "tools/call",
+          "tool": "merge_pull_request",
+          "target": "scm://platform/example-service/pull/482",
+          "arguments_digest": "sha256:53bdd5e4ad46d58adafed7a89380ea5663a23a3cc395cb0bfd3043e08539c04f",
+          "data_classification": "internal",
+          "canonical_hash": "sha256:3c2411af1c56c81064e144686779398c89bc0658cec3ea70ce74730173787d7d"
+        },
+        "context": {
+          "environment": "production",
+          "policy_bundle_digest": "sha256:2809889244eaf9c73f0fd4e38c805401d22ee8a7ee9bcf5adb43149b41e162cd"
+        }
+      }
+    }
+  }
+}

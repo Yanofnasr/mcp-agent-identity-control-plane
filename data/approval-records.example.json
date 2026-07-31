@@ -7,10 +7,21 @@
       "authority_subject_principal_id": "urn:example:principal:subject:01J8Y4K6V9",
       "agent_principal": "spiffe://agents.example.internal/prod/release-agent",
       "environment": "production",
-      "policy_bundle_digest": "sha256:2809889244eaf9c73f0fd4e38c805401d22ee8a7ee9bcf5adb43149b41e162cd",
+      "policy_bundle_digest": "sha256:62b9e5005ad6737d80c05f4c1f1ba0f48510c4d68da5a415d323008c850b993e",
       "approver_principal_id": "urn:example:principal:approver:01J8Y4V1F7",
       "approved_at": "2026-07-28T12:15:00Z",
-      "expires_at": "2026-07-28T12:30:00Z"
+      "expires_at": "2026-07-28T12:30:00Z",
+      "authority_mode": "user_delegated",
+      "execution_principal_id": "urn:example:workload:release-broker-prod",
+      "expected_audience": "https://source-control.example.internal",
+      "sender_constraint": "dpop",
+      "credential_profile": "source-control-user-delegated-critical",
+      "single_use": true,
+      "consumed": false,
+      "agent_definition_id": "urn:example:agent:release-agent",
+      "agent_version": "sha256:3f86d5d90ca8c9f96ef467ad31eb5ea1f10df2d10fc88d8a4723334d3d9470bb",
+      "runtime_instance_id": "runtime_01J8Y4M8YF",
+      "agent_credential_thumbprint": "sha256:8100b67f025b63b963929c43b581b122c239e4d6d48daaa4ad06c2099f450f61"
     }
   }
 }

@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "request": {
     "approval_id": "approval_01J8Y4Q63H",
     "session_id": "session_01J8Y4NG5B",
@@ -22,6 +22,9 @@
       "agent_version": "sha256:3f86d5d90ca8c9f96ef467ad31eb5ea1f10df2d10fc88d8a4723334d3d9470bb",
       "runtime_instance_id": "runtime_01J8Y4M8YF",
       "mcp_client_id": "release-agent-prod",
+      "credential_type": "x509_svid",
+      "credential_issuer": "https://workload-identity.example.internal",
+      "attestation_profile": "https://attestations.example.internal/profiles/release-agent/v1",
       "credential_thumbprint": "sha256:8100b67f025b63b963929c43b581b122c239e4d6d48daaa4ad06c2099f450f61",
       "credential_verified": true
     },
@@ -41,7 +44,7 @@
       "credential_verified": true,
       "authority_subject_principal_id": "urn:example:principal:subject:01J8Y4K6V9",
       "agent_actor_principal_id": "spiffe://agents.example.internal/prod/release-agent",
-      "delegation_verified": true
+      "authority_chain_verified": true
     },
     "action": {
       "mcp_server": "source-control",
@@ -54,7 +57,7 @@
     },
     "context": {
       "environment": "production",
-      "policy_bundle_digest": "sha256:2809889244eaf9c73f0fd4e38c805401d22ee8a7ee9bcf5adb43149b41e162cd"
+      "policy_bundle_digest": "sha256:62b9e5005ad6737d80c05f4c1f1ba0f48510c4d68da5a415d323008c850b993e"
     }
   }
 }

@@ -18,6 +18,15 @@ def sha256_prefixed(value: bytes) -> str:
     return "sha256:" + hashlib.sha256(value).hexdigest()
 
 
+def validate_canonical_action_field(name: str, value: Any) -> None:
+    if not isinstance(value, str):
+        raise SystemExit(f"Canonical action field must be a string: {name}")
+    if value == "":
+        raise SystemExit(f"Canonical action field must not be empty: {name}")
+    if "\n" in value or "\r" in value:
+        raise SystemExit(f"Canonical action field must not contain CR/LF: {name}")
+
+
 def canonical_action(action: dict[str, Any]) -> str:
     fields = (
         ("mcp_server", action["mcp_server"]),
@@ -27,6 +36,8 @@ def canonical_action(action: dict[str, Any]) -> str:
         ("arguments_digest", action["arguments_digest"]),
         ("data_classification", action["data_classification"]),
     )
+    for name, value in fields:
+        validate_canonical_action_field(name, value)
     return "\n".join(["agent-action-v1", *[f"{key}={value}" for key, value in fields]])
 
 

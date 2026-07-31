@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "event_id": "evt_01J8Y4T3T5M1A4FGKMGQ2Q6J7D",
   "occurred_at": "2026-07-28T12:20:04Z",
   "requester": {
@@ -19,6 +19,9 @@
     "agent_version": "sha256:3f86d5d90ca8c9f96ef467ad31eb5ea1f10df2d10fc88d8a4723334d3d9470bb",
     "runtime_instance_id": "runtime_01J8Y4M8YF",
     "mcp_client_id": "release-agent-prod",
+    "credential_type": "x509_svid",
+    "credential_issuer": "https://workload-identity.example.internal",
+    "attestation_profile": "https://attestations.example.internal/profiles/release-agent/v1",
     "credential_thumbprint": "sha256:8100b67f025b63b963929c43b581b122c239e4d6d48daaa4ad06c2099f450f61",
     "credential_verified": true
   },
@@ -38,7 +41,7 @@
     "credential_verified": true,
     "authority_subject_principal_id": "urn:example:principal:subject:01J8Y4K6V9",
     "agent_actor_principal_id": "spiffe://agents.example.internal/prod/release-agent",
-    "delegation_verified": true
+    "authority_chain_verified": true
   },
   "action": {
     "mcp_server": "source-control",
@@ -55,7 +58,7 @@
     "task_id": "task_01J8Y4P2TF",
     "correlation_id": "corr_01J8Y4PAP7",
     "environment": "production",
-    "policy_bundle_digest": "sha256:2809889244eaf9c73f0fd4e38c805401d22ee8a7ee9bcf5adb43149b41e162cd",
+    "policy_bundle_digest": "sha256:62b9e5005ad6737d80c05f4c1f1ba0f48510c4d68da5a415d323008c850b993e",
     "prompt_context_hash": "sha256:9bd600959ae39f3098b9b61949f6661d21f398a0a7ef83f062b1c31ba0ee7b99"
   },
   "approval": {
@@ -65,23 +68,45 @@
     "approver_principal_id": "urn:example:principal:approver:01J8Y4V1F7",
     "action_hash": "sha256:3c2411af1c56c81064e144686779398c89bc0658cec3ea70ce74730173787d7d",
     "approved_at": "2026-07-28T12:15:00Z",
-    "expires_at": "2026-07-28T12:30:00Z"
+    "expires_at": "2026-07-28T12:30:00Z",
+    "authority_mode": "user_delegated",
+    "execution_principal_id": "urn:example:workload:release-broker-prod",
+    "expected_audience": "https://source-control.example.internal",
+    "sender_constraint": "dpop",
+    "credential_profile": "source-control-user-delegated-critical",
+    "single_use": true,
+    "consumed": false,
+    "agent_definition_id": "urn:example:agent:release-agent",
+    "agent_version": "sha256:3f86d5d90ca8c9f96ef467ad31eb5ea1f10df2d10fc88d8a4723334d3d9470bb",
+    "runtime_instance_id": "runtime_01J8Y4M8YF",
+    "agent_credential_thumbprint": "sha256:8100b67f025b63b963929c43b581b122c239e4d6d48daaa4ad06c2099f450f61"
   },
   "decision": {
-    "outcome": "allow_with_approval",
-    "policy_id": "urn:example:policy:mcp-agent-tool-authorization",
-    "policy_version": "1.1.0",
-    "evaluated_at": "2026-07-28T12:20:02Z",
+    "allow": true,
+    "authority_mode": "user_delegated",
+    "requires_approval": true,
+    "deny_reasons": [],
     "reason_codes": [
-      "IDENTITY_CHAIN_VALID",
       "ACTION_HASH_VALID",
-      "AUDIENCE_BOUND_TO_TARGET",
-      "TOOL_AND_TARGET_ALLOWED",
-      "APPROVAL_BOUND_TO_ACTION"
+      "AGENT_CREDENTIAL_TRUSTED",
+      "AGENT_ENTITLED",
+      "APPROVAL_VALID",
+      "AUTHORITY_CHAIN_VALID",
+      "EXECUTION_IDENTITY_VALID",
+      "IDENTITY_CONTEXT_VALID",
+      "REQUEST_CONTEXT_VALID",
+      "TOOL_ACCESS_ALLOWED",
+      "VERIFIED_CONTEXT_VALID"
     ],
     "risk_tier": "critical",
     "credential_profile": "source-control-user-delegated-critical",
-    "credential_ttl_seconds": 900
+    "credential_ttl_seconds": 900,
+    "expected_audiences": [
+      "https://source-control.example.internal"
+    ],
+    "policy_id": "urn:example:policy:mcp-agent-tool-authorization",
+    "policy_version": "1.2.0",
+    "evaluated_at": "2026-07-28T12:20:02Z"
   },
   "result": {
     "status": "success",
@@ -89,8 +114,8 @@
     "completed_at": "2026-07-28T12:20:04Z"
   },
   "evidence": {
-    "record_digest": "sha256:4279e4d6fcc5cbf9f8d0595767a532c9b94ad6f27bd7d4f6eb440fb6d41deab0",
-    "digest_profile": "canonical-json-sort-keys-v1",
+    "record_digest": "sha256:aff468b609d6b0a288e1cfdd23e37b9228d940de275f688d2fb77c5790646dbf",
+    "digest_profile": "canonical-json-sort-keys-v2",
     "evidence_uri": "https://evidence.example.internal/events/evt_01J8Y4T3T5M1A4FGKMGQ2Q6J7D",
     "retention_class": "security",
     "contains_raw_credentials": false,

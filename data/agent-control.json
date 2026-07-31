@@ -1,7 +1,21 @@
 {
   "agent_control": {
     "policy_id": "urn:example:policy:mcp-agent-tool-authorization",
-    "policy_version": "1.1.0",
+    "policy_version": "1.2.0",
+    "trusted_agent_credentials": {
+      "spiffe://agents.example.internal/prod/release-agent": {
+        "credential_types": [
+          "x509_svid",
+          "jwt_svid"
+        ],
+        "credential_issuers": [
+          "https://workload-identity.example.internal"
+        ],
+        "attestation_profiles": [
+          "https://attestations.example.internal/profiles/release-agent/v1"
+        ]
+      }
+    },
     "servers": {
       "source-control": {
         "allowed_methods": [

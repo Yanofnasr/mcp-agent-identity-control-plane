@@ -60,14 +60,27 @@ def main() -> None:
 
     expected = {
         "allow": True,
+        "authority_mode": "user_delegated",
         "requires_approval": True,
         "deny_reasons": [],
+        "reason_codes": [
+            "ACTION_HASH_VALID",
+            "AGENT_CREDENTIAL_TRUSTED",
+            "AGENT_ENTITLED",
+            "APPROVAL_VALID",
+            "AUTHORITY_CHAIN_VALID",
+            "EXECUTION_IDENTITY_VALID",
+            "IDENTITY_CONTEXT_VALID",
+            "REQUEST_CONTEXT_VALID",
+            "TOOL_ACCESS_ALLOWED",
+            "VERIFIED_CONTEXT_VALID",
+        ],
         "risk_tier": "critical",
         "credential_profile": "source-control-user-delegated-critical",
         "credential_ttl_seconds": 900,
         "expected_audiences": ["https://source-control.example.internal"],
         "policy_id": "urn:example:policy:mcp-agent-tool-authorization",
-        "policy_version": "1.1.0",
+        "policy_version": "1.2.0",
     }
     if decision != expected:
         raise SystemExit(

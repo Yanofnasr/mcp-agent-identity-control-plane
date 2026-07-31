@@ -25,6 +25,8 @@ default credential_profile := "none"
 
 default credential_ttl_seconds := 0
 
+default reason_codes := []
+
 request_doc := object.get(input, "request", {})
 verified_doc := object.get(input, "verified", {})
 requester := object.get(verified_doc, "requester", {})
@@ -59,16 +61,18 @@ server_entitlement := object.get(
 )
 
 approval_id := object.get(request_doc, "approval_id", "")
-approval_record := object.get(
-	data.approval_records,
-	approval_id,
+approval_record := object.get(data.approval_records, approval_id, {})
+
+agent_trust_config := object.get(
+	object.get(data.agent_control, "trusted_agent_credentials", {}),
+	object.get(agent, "agent_principal", ""),
 	{},
 )
 
 now_ns := time.now_ns()
 
 input_shape_valid if {
-	input.schema_version == "1.1"
+	input.schema_version == "1.2"
 	count(request_doc) > 0
 	count(verified_doc) > 0
 }
@@ -115,9 +119,30 @@ agent_identity_valid if {
 	startswith(agent.agent_version, "sha256:")
 	count(agent.agent_version) == 71
 	agent.runtime_instance_id != ""
+	agent.credential_type != ""
+	agent.credential_issuer != ""
+	agent.attestation_profile != ""
 	startswith(agent.credential_thumbprint, "sha256:")
 	count(agent.credential_thumbprint) == 71
 	agent.credential_verified == true
+}
+
+agent_credential_type_trusted if {
+	agent.credential_type in object.get(agent_trust_config, "credential_types", [])
+}
+
+agent_credential_issuer_trusted if {
+	agent.credential_issuer in object.get(agent_trust_config, "credential_issuers", [])
+}
+
+agent_attestation_profile_trusted if {
+	agent.attestation_profile in object.get(agent_trust_config, "attestation_profiles", [])
+}
+
+agent_credential_trust_valid if {
+	agent_credential_type_trusted
+	agent_credential_issuer_trusted
+	agent_attestation_profile_trusted
 }
 
 agent_entitled if {
@@ -125,7 +150,7 @@ agent_entitled if {
 }
 
 authority_chain_valid if {
-	execution.delegation_verified == true
+	execution.authority_chain_verified == true
 	execution.authority_mode == "user_delegated"
 	authority_subject.authority_basis == "explicit_delegation"
 	authority_subject.principal_type in {"human", "service"}
@@ -134,7 +159,7 @@ authority_chain_valid if {
 }
 
 authority_chain_valid if {
-	execution.delegation_verified == true
+	execution.authority_chain_verified == true
 	execution.authority_mode == "agent_own"
 	authority_subject.authority_basis == "agent_own_authority"
 	authority_subject.principal_type == "workload"
@@ -144,7 +169,7 @@ authority_chain_valid if {
 }
 
 authority_chain_valid if {
-	execution.delegation_verified == true
+	execution.authority_chain_verified == true
 	execution.authority_mode == "brokered_service"
 	authority_subject.authority_basis in {"organizational_mandate", "service_delegation"}
 	authority_subject.principal_type in {"service", "workload"}
@@ -166,6 +191,24 @@ computed_action_hash := sprintf(
 	"sha256:%s",
 	[crypto.sha256(canonical_action_string)],
 )
+
+canonical_action_field_valid(value) if {
+	type_name(value) == "string"
+	value != ""
+	not contains(value, "\n")
+	not contains(value, "\r")
+}
+
+action_canonicalizable if {
+	canonical_action_field_valid(action.mcp_server)
+	canonical_action_field_valid(action.method)
+	canonical_action_field_valid(action.tool)
+	canonical_action_field_valid(action.target)
+	canonical_action_field_valid(action.arguments_digest)
+	regex.match("^sha256:[a-f0-9]{64}$", action.arguments_digest)
+	canonical_action_field_valid(action.data_classification)
+	action.data_classification in {"public", "internal", "confidential", "restricted"}
+}
 
 action_hash_valid if {
 	action.canonical_hash == computed_action_hash
@@ -223,6 +266,12 @@ expected_audiences_for_target contains binding.audience if {
 	target_matches(binding.target_pattern, action.target)
 }
 
+sole_expected_audience := audience if {
+	matched_audiences := expected_audiences
+	count(matched_audiences) == 1
+	audience := matched_audiences[0]
+}
+
 execution_principal_allowed if {
 	execution.principal_id in object.get(agent_entitlement, "allowed_execution_principals", [])
 }
@@ -236,8 +285,9 @@ execution_issuer_trusted if {
 }
 
 execution_audience_bound_to_target if {
+	count(expected_audiences) == 1
 	count(execution.audiences) == 1
-	execution.audiences[0] in expected_audiences_for_target
+	execution.audiences[0] == sole_expected_audience
 }
 
 sender_constraint_allowed if {
@@ -310,8 +360,21 @@ approval_binding_valid if {
 	approval_record.requester_principal_id == requester.principal_id
 	approval_record.authority_subject_principal_id == authority_subject.principal_id
 	approval_record.agent_principal == agent.agent_principal
+	approval_record.agent_definition_id == agent.agent_definition_id
+	approval_record.agent_version == agent.agent_version
+	approval_record.runtime_instance_id == agent.runtime_instance_id
+	approval_record.agent_credential_thumbprint == agent.credential_thumbprint
 	approval_record.environment == context.environment
 	approval_record.policy_bundle_digest == context.policy_bundle_digest
+}
+
+approval_contract_binding_valid if {
+	approval_record.authority_mode == execution.authority_mode
+	approval_record.execution_principal_id == execution.principal_id
+	approval_record.expected_audience == sole_expected_audience
+	approval_record.expected_audience == execution.audiences[0]
+	approval_record.sender_constraint == execution.sender_constraint
+	approval_record.credential_profile == selected_credential_profile
 }
 
 approval_time_valid if {
@@ -321,14 +384,27 @@ approval_time_valid if {
 	now_ns < expires_at_ns
 }
 
+approval_approver_present if {
+	approval_record.approver_principal_id != ""
+}
+
 approval_separation_valid if {
 	object.get(tool_config, "approval_mode", "confirmation") != "independent"
 }
 
 approval_separation_valid if {
 	object.get(tool_config, "approval_mode", "confirmation") == "independent"
+	approval_approver_present
 	approval_record.approver_principal_id != requester.principal_id
 	approval_record.approver_principal_id != authority_subject.principal_id
+}
+
+approval_single_use_valid if {
+	approval_record.single_use == true
+}
+
+approval_not_consumed if {
+	approval_record.consumed == false
 }
 
 approval_valid if {
@@ -339,8 +415,12 @@ approval_valid if {
 	requires_approval
 	approval_record_present
 	approval_binding_valid
+	approval_contract_binding_valid
 	approval_time_valid
+	approval_approver_present
 	approval_separation_valid
+	approval_single_use_valid
+	approval_not_consumed
 }
 
 allow if {
@@ -350,8 +430,10 @@ allow if {
 	requester_valid
 	authority_subject_valid
 	agent_identity_valid
+	agent_credential_trust_valid
 	agent_entitled
 	authority_chain_valid
+	action_canonicalizable
 	action_hash_valid
 	method_allowed
 	tool_allowed
@@ -386,6 +468,18 @@ deny_reasons contains "AGENT_IDENTITY_INVALID" if {
 	not agent_identity_valid
 }
 
+deny_reasons contains "AGENT_CREDENTIAL_TYPE_NOT_TRUSTED" if {
+	not agent_credential_type_trusted
+}
+
+deny_reasons contains "AGENT_CREDENTIAL_ISSUER_NOT_TRUSTED" if {
+	not agent_credential_issuer_trusted
+}
+
+deny_reasons contains "AGENT_ATTESTATION_PROFILE_NOT_TRUSTED" if {
+	not agent_attestation_profile_trusted
+}
+
 deny_reasons contains "AGENT_NOT_ENTITLED" if {
 	not agent_entitled
 }
@@ -396,6 +490,10 @@ deny_reasons contains "AUTHORITY_CHAIN_INVALID" if {
 
 deny_reasons contains "ACTION_HASH_INVALID" if {
 	not action_hash_valid
+}
+
+deny_reasons contains "ACTION_CANONICALIZATION_INVALID" if {
+	not action_canonicalizable
 }
 
 deny_reasons contains "METHOD_NOT_ALLOWED" if {
@@ -456,7 +554,103 @@ deny_reasons contains "EXECUTION_IDENTITY_INVALID" if {
 
 deny_reasons contains "APPROVAL_INVALID_OR_MISSING" if {
 	requires_approval
-	not approval_valid
+	not approval_record_present
+}
+
+deny_reasons contains "APPROVAL_BINDING_MISMATCH" if {
+	requires_approval
+	approval_record_present
+	not approval_binding_valid
+}
+
+deny_reasons contains "APPROVAL_CONTRACT_MISMATCH" if {
+	requires_approval
+	approval_record_present
+	not approval_contract_binding_valid
+}
+
+deny_reasons contains "APPROVAL_EXPIRED_OR_INVALID" if {
+	requires_approval
+	approval_record_present
+	not approval_time_valid
+}
+
+deny_reasons contains "APPROVAL_APPROVER_IDENTITY_MISSING" if {
+	requires_approval
+	approval_record_present
+	not approval_approver_present
+}
+
+deny_reasons contains "APPROVAL_SEPARATION_INVALID" if {
+	requires_approval
+	approval_record_present
+	not approval_separation_valid
+}
+
+deny_reasons contains "APPROVAL_NOT_SINGLE_USE" if {
+	requires_approval
+	approval_record_present
+	not approval_single_use_valid
+}
+
+deny_reasons contains "APPROVAL_ALREADY_CONSUMED" if {
+	requires_approval
+	approval_record_present
+	not approval_not_consumed
+}
+
+approval_reason_code := "APPROVAL_VALID" if {
+	allow
+	requires_approval
+}
+
+approval_reason_code := "APPROVAL_NOT_REQUIRED" if {
+	allow
+	not requires_approval
+}
+
+allow_reason_codes contains "ACTION_HASH_VALID" if {
+	allow
+}
+
+allow_reason_codes contains "AGENT_CREDENTIAL_TRUSTED" if {
+	allow
+}
+
+allow_reason_codes contains "AGENT_ENTITLED" if {
+	allow
+}
+
+allow_reason_codes contains approval_reason_code if {
+	allow
+}
+
+allow_reason_codes contains "AUTHORITY_CHAIN_VALID" if {
+	allow
+}
+
+allow_reason_codes contains "EXECUTION_IDENTITY_VALID" if {
+	allow
+}
+
+allow_reason_codes contains "IDENTITY_CONTEXT_VALID" if {
+	allow
+}
+
+allow_reason_codes contains "REQUEST_CONTEXT_VALID" if {
+	allow
+}
+
+allow_reason_codes contains "TOOL_ACCESS_ALLOWED" if {
+	allow
+}
+
+allow_reason_codes contains "VERIFIED_CONTEXT_VALID" if {
+	allow
+}
+
+reason_codes := sort([code | allow_reason_codes[code]]) if {
+	allow
 }
 
 credential_profile := selected_credential_profile if {
@@ -480,8 +674,10 @@ audience |
 
 decision := {
 	"allow": allow,
+	"authority_mode": object.get(execution, "authority_mode", "unknown"),
 	"requires_approval": requires_approval,
 	"deny_reasons": sort([reason | deny_reasons[reason]]),
+	"reason_codes": reason_codes,
 	"risk_tier": risk_tier,
 	"credential_profile": credential_profile,
 	"credential_ttl_seconds": credential_ttl_seconds,

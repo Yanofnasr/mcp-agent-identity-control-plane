@@ -12,7 +12,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "1.1"
+      "const": "1.2"
     },
     "request": {
       "type": "object",
@@ -70,6 +70,7 @@
           "$ref": "#/$defs/execution"
         },
         "action": {
+          "description": "The final normalized live invocation reconstructed by the final policy enforcement point immediately before evaluation. It is not a caller-carried pre-issuance payload.",
           "$ref": "#/$defs/action"
         },
         "context": {
@@ -143,6 +144,9 @@
         "agent_definition_id",
         "agent_version",
         "runtime_instance_id",
+        "credential_type",
+        "credential_issuer",
+        "attestation_profile",
         "credential_thumbprint",
         "credential_verified"
       ],
@@ -171,6 +175,21 @@
           "minLength": 1,
           "maxLength": 256
         },
+        "credential_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "credential_issuer": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "attestation_profile": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
         "credential_thumbprint": {
           "type": "string",
           "pattern": "^sha256:[a-f0-9]{64}$"
@@ -188,7 +207,7 @@
         "principal_id",
         "authority_subject_principal_id",
         "agent_actor_principal_id",
-        "delegation_verified",
+        "authority_chain_verified",
         "credential_type",
         "issuer",
         "audiences",
@@ -275,7 +294,7 @@
           "minLength": 1,
           "maxLength": 1024
         },
-        "delegation_verified": {
+        "authority_chain_verified": {
           "const": true
         }
       }
@@ -296,22 +315,26 @@
         "mcp_server": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 256
+          "maxLength": 256,
+          "pattern": "^[^\\r\\n]+$"
         },
         "method": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 256
+          "maxLength": 256,
+          "pattern": "^[^\\r\\n]+$"
         },
         "tool": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 256
+          "maxLength": 256,
+          "pattern": "^[^\\r\\n]+$"
         },
         "target": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 2048
+          "maxLength": 2048,
+          "pattern": "^[^\\r\\n]+$"
         },
         "arguments_digest": {
           "type": "string",

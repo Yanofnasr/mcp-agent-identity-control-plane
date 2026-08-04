@@ -1,6 +1,6 @@
 # Validation status
 
-Generated for release **1.1.0** on **2026-07-28**.
+Generated for release **1.2.0** on **2026-08-04**.
 
 ## Executed locally
 
@@ -16,16 +16,12 @@ The following gates are executed by `make validate-structure`:
 - Issuer, sender constraint, credential lifetime, entitlement, and production-write checks
 - Audit-event consistency and record-digest reproduction
 - Negative schema checks for caller-supplied time, entitlements, approval state, multiple audiences, and missing identity bindings
-- Package allowlist, prohibited-file, direct-email and unresolved-placeholder checks
+- Package allowlist, staged-tree verification, extracted-archive verification, prohibited-file, direct-email and unresolved-placeholder checks
 - CI pinning and release-command checks
 
-The final build also runs `sha256sum -c MANIFEST.sha256` and verifies the extracted ZIP against the source manifest.
+The Python dependency graph is exact-pinned, hash-locked, and restricted to reviewed binary wheels for CPython 3.11 and 3.12 on Linux x86-64.
 
-## CI-only runtime gate
-
-The isolated build environment does not include an executable OPA binary, so this pack does not claim a local OPA parse, compile, test, or evaluation result.
-
-The included GitHub Actions workflow performs the remaining release gate with pinned OPA **v1.18.2**:
+The official OPA **v1.18.2** Linux AMD64 static binary was downloaded outside the repository and verified against its published SHA-256 digest. The following runtime gate passed locally:
 
 ```text
 opa fmt --fail --check-result -l policy/*.rego
@@ -34,4 +30,10 @@ opa test policy data --fail-on-empty -v
 python3 scripts/evaluate_example.py
 ```
 
-The workflow verifies the official Linux AMD64 static-binary SHA-256 digest before execution. Publication should be gated on a passing workflow run.
+Result: **31/31 Rego tests passed**, strict compilation passed, and the live allow-path decision matched the checked-in 1.2 contract.
+
+Two independently built release archives were then compared byte-for-byte. The staged tree and extracted ZIP were each checked with `sha256sum --check --strict MANIFEST.sha256` and the explicit package allowlist. The final archive hash is recorded in the release handoff.
+
+## Continuous integration
+
+The included GitHub Actions workflow repeats the structural and runtime gates with Python 3.12, the same hash-locked dependency graph, immutable action SHAs, and the pinned OPA checksum. Publication should still be gated on a passing workflow run after push.

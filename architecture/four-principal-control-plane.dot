@@ -58,7 +58,7 @@ digraph FourPrincipalControlPlane {
 
   trusted [
     shape=folder,
-    label="TRUSTED CONTROL DATA\nSigned policy bundle • entitlements • issuer rules\ntarget-audience mapping • authoritative approval record",
+    label="TRUSTED CONTROL DATA\nSigned policy bundle • entitlements • workload + execution issuer rules\ntarget-audience mapping • single-use approval bound to execution",
     fillcolor="#F3F0FF"
   ];
 

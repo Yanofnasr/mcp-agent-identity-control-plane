@@ -40,9 +40,9 @@ digraph AgentIdentityControlPlane {
   issuer [label="IDENTITY PROVIDER + WORKLOAD ISSUER\nValidate requester and agent credentials", fillcolor="#EEF4FF"];
   ingress [label="INGRESS PEP\nResolve principals • normalize action\ncompute hash • classify environment", fillcolor="#FFF5E6"];
 
-  trusted [shape=folder, label="TRUSTED POLICY DATA\nTools • entitlements • issuers\ntarget-audience bindings", fillcolor="#F3F0FF"];
+  trusted [shape=folder, label="TRUSTED POLICY DATA\nTools • entitlements • workload + execution issuers\ntarget-audience bindings", fillcolor="#F3F0FF"];
   pdp [label="POLICY DECISION POINT\nAuthority mode • tool • target • risk\napproval • trusted time", fillcolor="#FFF0F0"];
-  approvals [shape=folder, label="APPROVAL SERVICE\nVerified record bound to action, identities,\nenvironment and policy bundle", fillcolor="#F3F0FF"];
+  approvals [shape=folder, label="APPROVAL SERVICE\nSingle-use record bound to action, authority, execution,\nenvironment and policy bundle", fillcolor="#F3F0FF"];
 
   broker [label="CREDENTIAL BROKER / STS\nIssue bounded target authority", fillcolor="#EEF4FF"];
   p4 [label="P4 EXECUTION PRINCIPAL\nIdentity authorized by the target", fillcolor="#EAF7F0"];

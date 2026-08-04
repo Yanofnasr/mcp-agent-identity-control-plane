@@ -189,7 +189,6 @@ EXPECTED_REQUIREMENTS = {
     },
 }
 
-
 EXPECTED_ALLOW_REASON_CODES = sorted(
     [
         "ACTION_HASH_VALID",
@@ -588,17 +587,7 @@ def validate_policy_source() -> None:
             raise AssertionError(f"OPA release gate is incomplete: {fragment}")
 
 
-def snippet_has_field(document: dict[str, Any], dotted_path: str) -> bool:
-    node: Any = document
-    for part in dotted_path.split("."):
-        if not isinstance(node, dict) or part not in node:
-            return False
-        node = node[part]
-    return True
-
-
 def validate_privacy() -> None:
-
     pii_email = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
     text_suffixes = {".md", ".json", ".yaml", ".yml", ".rego", ".dot", ".py", ".sh"}
     for path in SCRIPT_ROOT.rglob("*"):
@@ -835,7 +824,6 @@ def validate_examples_and_policy_data() -> tuple[str, str, str, str, str, str, s
     expected_record_digest = sha256_prefixed(canonical_json(audit_for_digest))
     if evidence["record_digest"] != expected_record_digest:
         raise AssertionError("Audit record_digest is inconsistent")
-
 
     negative = copy.deepcopy(authz)
     negative["request"]["now"] = "2099-01-01T00:00:00Z"

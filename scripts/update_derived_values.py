@@ -3,11 +3,9 @@
 
 from __future__ import annotations
 
-import argparse
 import copy
 import hashlib
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -124,9 +122,6 @@ def build_allow_decision(agent_control_doc: dict[str, Any], authz: dict[str, Any
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.parse_args()
-
     authz = read_json("examples/authorization-context.example.json")
     arguments = read_json("examples/action-arguments.example.json")
     agent_control_doc = read_json("data/agent-control.json")
@@ -235,7 +230,6 @@ def main() -> None:
     write_json("data/test-fixtures.json", {"test_fixtures": {"valid_input": authz}})
     write_json("data/approval-records.example.json", approvals_doc)
     write_json("examples/agent-action-event.example.json", audit)
-
     print(f"arguments_digest={action['arguments_digest']}")
     print(f"action_hash={action['canonical_hash']}")
     print(f"policy_bundle_digest={policy_digest}")

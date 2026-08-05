@@ -1,0 +1,15 @@
+version: 2
+
+updates:
+  # Actions only. The pip graph is exact-pinned and hash-locked in
+  # requirements-dev.txt, and automated bumps would break --require-hashes.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies
+      - github-actions

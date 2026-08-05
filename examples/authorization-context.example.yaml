@@ -1,4 +1,4 @@
-schema_version: '1.2'
+schema_version: '1.3'
 request:
   approval_id: approval_01J8Y4Q63H
   session_id: session_01J8Y4NG5B
@@ -49,4 +49,4 @@ verified:
     canonical_hash: sha256:3c2411af1c56c81064e144686779398c89bc0658cec3ea70ce74730173787d7d
   context:
     environment: production
-    policy_bundle_digest: sha256:62b9e5005ad6737d80c05f4c1f1ba0f48510c4d68da5a415d323008c850b993e
+    policy_bundle_digest: sha256:0de08f79736aef34cd2a5380177fef7ddbd31b9719dfbe23d583636adb23a64a

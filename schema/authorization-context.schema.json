@@ -12,7 +12,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "1.2"
+      "const": "1.3"
     },
     "request": {
       "type": "object",
@@ -29,6 +29,7 @@
           "maxLength": 128
         },
         "session_id": {
+          "description": "Application-level correlation identifier; not an MCP protocol session or Mcp-Session-Id header.",
           "type": "string",
           "minLength": 1,
           "maxLength": 128

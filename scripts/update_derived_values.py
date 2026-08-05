@@ -9,13 +9,15 @@ import json
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
+from canonical_json import (
+    PROFILE_NAME,
+    CanonicalJSONError,
+    canonical_json_bytes,
+    load_canonical_json,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def canonical_json(value: Any) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
 def sha256_prefixed(value: bytes) -> str:
@@ -52,14 +54,21 @@ def target_matches(pattern: str, target: str) -> bool:
 
 
 def read_json(relative: str) -> Any:
-    return json.loads((ROOT / relative).read_text(encoding="utf-8"))
+    try:
+        return load_canonical_json(ROOT / relative)
+    except CanonicalJSONError as exc:
+        raise RuntimeError(f"{relative}: {exc}") from exc
 
 
 def write_json(relative: str, value: Any) -> None:
-    (ROOT / relative).write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (ROOT / relative).write_text(
+        json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 
-def expected_audiences_for_action(agent_control_doc: dict[str, Any], authz: dict[str, Any]) -> list[str]:
+def expected_audiences_for_action(
+    agent_control_doc: dict[str, Any], authz: dict[str, Any]
+) -> list[str]:
     action = authz["verified"]["action"]
     server = agent_control_doc["agent_control"]["servers"][action["mcp_server"]]
     audiences = {
@@ -70,13 +79,19 @@ def expected_audiences_for_action(agent_control_doc: dict[str, Any], authz: dict
     return sorted(audiences)
 
 
-def selected_credential_profile(agent_control_doc: dict[str, Any], authz: dict[str, Any]) -> str:
+def selected_credential_profile(
+    agent_control_doc: dict[str, Any], authz: dict[str, Any]
+) -> str:
     action = authz["verified"]["action"]
     mode = authz["verified"]["execution"]["authority_mode"]
-    tool = agent_control_doc["agent_control"]["servers"][action["mcp_server"]]["tools"][action["tool"]]
+    tool = agent_control_doc["agent_control"]["servers"][action["mcp_server"]]["tools"][
+        action["tool"]
+    ]
     profile = tool["credential_profiles"].get(mode)
-    if not profile:
-        raise RuntimeError(f"Missing credential profile for authority_mode={mode}")
+    if not isinstance(profile, str) or not profile:
+        raise RuntimeError(
+            f"Missing or invalid credential profile for authority_mode={mode}"
+        )
     return profile
 
 
@@ -84,7 +99,9 @@ def allow_reason_codes(tool: dict[str, Any], authz: dict[str, Any]) -> list[str]
     requires_approval = tool["requires_approval"] or (
         authz["verified"]["context"]["environment"] == "production" and tool["write"]
     )
-    approval_reason_code = "APPROVAL_VALID" if requires_approval else "APPROVAL_NOT_REQUIRED"
+    approval_reason_code = (
+        "APPROVAL_VALID" if requires_approval else "APPROVAL_NOT_REQUIRED"
+    )
     return sorted(
         [
             "ACTION_HASH_VALID",
@@ -101,15 +118,22 @@ def allow_reason_codes(tool: dict[str, Any], authz: dict[str, Any]) -> list[str]
     )
 
 
-def build_allow_decision(agent_control_doc: dict[str, Any], authz: dict[str, Any]) -> dict[str, Any]:
+def build_allow_decision(
+    agent_control_doc: dict[str, Any], authz: dict[str, Any]
+) -> dict[str, Any]:
     action = authz["verified"]["action"]
     execution = authz["verified"]["execution"]
-    tool = agent_control_doc["agent_control"]["servers"][action["mcp_server"]]["tools"][action["tool"]]
+    tool = agent_control_doc["agent_control"]["servers"][action["mcp_server"]]["tools"][
+        action["tool"]
+    ]
     return {
         "allow": True,
         "authority_mode": execution["authority_mode"],
         "requires_approval": tool["requires_approval"]
-        or (authz["verified"]["context"]["environment"] == "production" and tool["write"]),
+        or (
+            authz["verified"]["context"]["environment"] == "production"
+            and tool["write"]
+        ),
         "deny_reasons": [],
         "reason_codes": allow_reason_codes(tool, authz),
         "risk_tier": tool["risk_tier"],
@@ -129,35 +153,44 @@ def main() -> None:
     audit = read_json("examples/agent-action-event.example.json")
 
     action = authz["verified"]["action"]
-    action["arguments_digest"] = sha256_prefixed(canonical_json(arguments))
-    action["canonical_hash"] = sha256_prefixed(action_canonical_string(action).encode("utf-8"))
+    action["arguments_digest"] = sha256_prefixed(canonical_json_bytes(arguments))
+    action["canonical_hash"] = sha256_prefixed(
+        action_canonical_string(action).encode("utf-8")
+    )
 
     policy_bytes = (ROOT / "policy/mcp-tool-authorization.rego").read_bytes()
     policy_digest = sha256_prefixed(
         b"mcp-agent-policy-bundle-v1\n"
         + policy_bytes
         + b"\n"
-        + canonical_json(agent_control_doc["agent_control"])
+        + canonical_json_bytes(agent_control_doc["agent_control"])
     )
     authz["verified"]["context"]["policy_bundle_digest"] = policy_digest
-    authz["schema_version"] = "1.2"
+    authz["schema_version"] = "1.3"
 
     approval_id = authz["request"]["approval_id"]
     approval = approvals_doc["approval_records"][approval_id]
     expected_audiences = expected_audiences_for_action(agent_control_doc, authz)
     if len(expected_audiences) != 1:
-        raise RuntimeError("Expected exactly one audience binding for the reference example")
+        raise RuntimeError(
+            "Expected exactly one audience binding for the reference example"
+        )
     credential_profile = selected_credential_profile(agent_control_doc, authz)
+    decision_evaluated_at = audit["decision"].get("evaluated_at", audit["occurred_at"])
     approval.update(
         {
             "action_hash": action["canonical_hash"],
             "requester_principal_id": authz["verified"]["requester"]["principal_id"],
-            "authority_subject_principal_id": authz["verified"]["authority_subject"]["principal_id"],
+            "authority_subject_principal_id": authz["verified"]["authority_subject"][
+                "principal_id"
+            ],
             "agent_principal": authz["verified"]["agent"]["agent_principal"],
             "agent_definition_id": authz["verified"]["agent"]["agent_definition_id"],
             "agent_version": authz["verified"]["agent"]["agent_version"],
             "runtime_instance_id": authz["verified"]["agent"]["runtime_instance_id"],
-            "agent_credential_thumbprint": authz["verified"]["agent"]["credential_thumbprint"],
+            "agent_credential_thumbprint": authz["verified"]["agent"][
+                "credential_thumbprint"
+            ],
             "authority_mode": authz["verified"]["execution"]["authority_mode"],
             "execution_principal_id": authz["verified"]["execution"]["principal_id"],
             "expected_audience": expected_audiences[0],
@@ -177,7 +210,9 @@ def main() -> None:
     }
     audit["authority_subject"] = {
         **authz["verified"]["authority_subject"],
-        "tenant_id": audit["authority_subject"].get("tenant_id", "urn:example:tenant:primary"),
+        "tenant_id": audit["authority_subject"].get(
+            "tenant_id", "urn:example:tenant:primary"
+        ),
     }
     audit["agent"] = authz["verified"]["agent"]
     audit["execution"] = authz["verified"]["execution"]
@@ -192,6 +227,7 @@ def main() -> None:
             "policy_bundle_digest": policy_digest,
         }
     )
+    audit["context"].pop("prompt_context_hash", None)
     audit["approval"].update(
         {
             "approval_id": approval_id,
@@ -206,7 +242,9 @@ def main() -> None:
             "sender_constraint": approval["sender_constraint"],
             "credential_profile": approval["credential_profile"],
             "single_use": approval["single_use"],
-            "consumed": approval["consumed"],
+            "consumed": True,
+            "consumed_at": decision_evaluated_at,
+            "consumption_id": f"{approval_id}:{audit['event_id']}",
             "action_hash": action["canonical_hash"],
             "approved_at": approval["approved_at"],
             "expires_at": approval["expires_at"],
@@ -214,13 +252,15 @@ def main() -> None:
     )
     audit["decision"] = {
         **build_allow_decision(agent_control_doc, authz),
-        "evaluated_at": audit["decision"].get("evaluated_at", audit["occurred_at"]),
+        "evaluated_at": decision_evaluated_at,
     }
-    audit["evidence"]["digest_profile"] = "canonical-json-sort-keys-v2"
+    audit["evidence"]["digest_profile"] = PROFILE_NAME
 
     audit_for_digest = copy.deepcopy(audit)
     audit_for_digest["evidence"].pop("record_digest", None)
-    audit["evidence"]["record_digest"] = sha256_prefixed(canonical_json(audit_for_digest))
+    audit["evidence"]["record_digest"] = sha256_prefixed(
+        canonical_json_bytes(audit_for_digest)
+    )
 
     write_json("examples/authorization-context.example.json", authz)
     (ROOT / "examples/authorization-context.example.yaml").write_text(

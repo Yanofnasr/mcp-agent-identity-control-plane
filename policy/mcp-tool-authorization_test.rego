@@ -8,6 +8,7 @@ base_input := data.test_fixtures.valid_input
 mock_now_ns := 1785241230000000000
 mock_after_approval_expiry_ns := 1785241860000000000
 mock_after_execution_expiry_ns := 1785242160000000000
+non_hex_sha256 := "sha256:gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
 
 patch_request(patch) := object.union(base_input, {
 	"request": object.union(base_input.request, patch),
@@ -28,6 +29,12 @@ patch_authority_subject(patch) := object.union(base_input, {
 patch_execution(patch) := object.union(base_input, {
 	"verified": object.union(base_input.verified, {
 		"execution": object.union(base_input.verified.execution, patch),
+	}),
+})
+
+patch_context(patch) := object.union(base_input, {
+	"verified": object.union(base_input.verified, {
+		"context": object.union(base_input.verified.context, patch),
 	}),
 })
 
@@ -78,7 +85,7 @@ test_valid_production_merge if {
 	valid_decision.credential_ttl_seconds == 900
 	valid_decision.expected_audiences == ["https://source-control.example.internal"]
 	valid_decision.policy_id == "urn:example:policy:mcp-agent-tool-authorization"
-	valid_decision.policy_version == "1.2.0"
+	valid_decision.policy_version == "1.3.0"
 }
 
 test_allow_decision_shape_includes_authority_mode_and_reason_codes if {
@@ -129,6 +136,58 @@ test_multiple_audiences_are_denied if {
 test_missing_sender_binding_is_denied if {
 	test_input := patch_execution({
 		"credential_thumbprint": "",
+	})
+
+	result := authz.decision
+		with input as test_input
+		with time.now_ns as mock_now_ns
+
+	result.allow == false
+	"EXECUTION_SENDER_BINDING_MISSING" in result.deny_reasons
+}
+
+test_non_hex_policy_bundle_digest_is_denied if {
+	test_input := patch_context({
+		"policy_bundle_digest": non_hex_sha256,
+	})
+
+	result := authz.decision
+		with input as test_input
+		with time.now_ns as mock_now_ns
+
+	result.allow == false
+	"VERIFIED_CONTEXT_INVALID" in result.deny_reasons
+}
+
+test_non_hex_agent_version_is_denied if {
+	test_input := patch_agent({
+		"agent_version": non_hex_sha256,
+	})
+
+	result := authz.decision
+		with input as test_input
+		with time.now_ns as mock_now_ns
+
+	result.allow == false
+	"AGENT_IDENTITY_INVALID" in result.deny_reasons
+}
+
+test_non_hex_agent_thumbprint_is_denied if {
+	test_input := patch_agent({
+		"credential_thumbprint": non_hex_sha256,
+	})
+
+	result := authz.decision
+		with input as test_input
+		with time.now_ns as mock_now_ns
+
+	result.allow == false
+	"AGENT_IDENTITY_INVALID" in result.deny_reasons
+}
+
+test_non_hex_execution_thumbprint_is_denied if {
+	test_input := patch_execution({
+		"credential_thumbprint": non_hex_sha256,
 	})
 
 	result := authz.decision
@@ -564,4 +623,23 @@ test_brokered_service_read_only_access_allowed if {
 	result.requires_approval == false
 	result.credential_profile == "source-control-brokered-read-only"
 	"APPROVAL_NOT_REQUIRED" in result.reason_codes
+}
+
+test_unmapped_target_returns_empty_expected_audiences if {
+	unmapped_target := object.union(base_input, {
+		"verified": object.union(base_input.verified, {
+			"action": object.union(base_input.verified.action, {
+				"target": "scm://unmapped/repository/pull/1",
+			}),
+		}),
+	})
+
+	result := authz.decision
+		with input as unmapped_target
+		with time.now_ns as mock_now_ns
+
+	result.allow == false
+	result.expected_audiences == []
+	"TARGET_NOT_ALLOWED" in result.deny_reasons
+	"EXECUTION_AUDIENCE_MISMATCH" in result.deny_reasons
 }

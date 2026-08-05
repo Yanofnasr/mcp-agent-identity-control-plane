@@ -29,9 +29,17 @@ default reason_codes := []
 
 request_doc := object.get(input, "request", {})
 verified_doc := object.get(input, "verified", {})
+
+# P1: requesting principal
 requester := object.get(verified_doc, "requester", {})
+
+# P2: authority subject
 authority_subject := object.get(verified_doc, "authority_subject", {})
+
+# P3: agent principal
 agent := object.get(verified_doc, "agent", {})
+
+# P4: execution principal
 execution := object.get(verified_doc, "execution", {})
 action := object.get(verified_doc, "action", {})
 context := object.get(verified_doc, "context", {})
@@ -71,8 +79,13 @@ agent_trust_config := object.get(
 
 now_ns := time.now_ns()
 
+sha256_digest_valid(value) if {
+	type_name(value) == "string"
+	regex.match("^sha256:[a-f0-9]{64}$", value)
+}
+
 input_shape_valid if {
-	input.schema_version == "1.2"
+	input.schema_version == "1.3"
 	count(request_doc) > 0
 	count(verified_doc) > 0
 }
@@ -85,8 +98,7 @@ request_context_valid if {
 
 context_valid if {
 	context.environment in {"development", "test", "staging", "production"}
-	startswith(context.policy_bundle_digest, "sha256:")
-	count(context.policy_bundle_digest) == 71
+	sha256_digest_valid(context.policy_bundle_digest)
 }
 
 requester_valid if {
@@ -116,14 +128,12 @@ agent_principal_format_valid if {
 agent_identity_valid if {
 	agent_principal_format_valid
 	agent.agent_definition_id != ""
-	startswith(agent.agent_version, "sha256:")
-	count(agent.agent_version) == 71
+	sha256_digest_valid(agent.agent_version)
 	agent.runtime_instance_id != ""
 	agent.credential_type != ""
 	agent.credential_issuer != ""
 	agent.attestation_profile != ""
-	startswith(agent.credential_thumbprint, "sha256:")
-	count(agent.credential_thumbprint) == 71
+	sha256_digest_valid(agent.credential_thumbprint)
 	agent.credential_verified == true
 }
 
@@ -205,7 +215,7 @@ action_canonicalizable if {
 	canonical_action_field_valid(action.tool)
 	canonical_action_field_valid(action.target)
 	canonical_action_field_valid(action.arguments_digest)
-	regex.match("^sha256:[a-f0-9]{64}$", action.arguments_digest)
+	sha256_digest_valid(action.arguments_digest)
 	canonical_action_field_valid(action.data_classification)
 	action.data_classification in {"public", "internal", "confidential", "restricted"}
 }
@@ -295,8 +305,7 @@ sender_constraint_allowed if {
 }
 
 sender_binding_present if {
-	startswith(execution.credential_thumbprint, "sha256:")
-	count(execution.credential_thumbprint) == 71
+	sha256_digest_valid(execution.credential_thumbprint)
 }
 
 execution_time_valid if {

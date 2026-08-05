@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.2",
+  "schema_version": "1.3",
   "event_id": "evt_01J8Y4T3T5M1A4FGKMGQ2Q6J7D",
   "occurred_at": "2026-07-28T12:20:04Z",
   "requester": {
@@ -58,8 +58,7 @@
     "task_id": "task_01J8Y4P2TF",
     "correlation_id": "corr_01J8Y4PAP7",
     "environment": "production",
-    "policy_bundle_digest": "sha256:62b9e5005ad6737d80c05f4c1f1ba0f48510c4d68da5a415d323008c850b993e",
-    "prompt_context_hash": "sha256:9bd600959ae39f3098b9b61949f6661d21f398a0a7ef83f062b1c31ba0ee7b99"
+    "policy_bundle_digest": "sha256:0de08f79736aef34cd2a5380177fef7ddbd31b9719dfbe23d583636adb23a64a"
   },
   "approval": {
     "required": true,
@@ -75,11 +74,13 @@
     "sender_constraint": "dpop",
     "credential_profile": "source-control-user-delegated-critical",
     "single_use": true,
-    "consumed": false,
+    "consumed": true,
     "agent_definition_id": "urn:example:agent:release-agent",
     "agent_version": "sha256:3f86d5d90ca8c9f96ef467ad31eb5ea1f10df2d10fc88d8a4723334d3d9470bb",
     "runtime_instance_id": "runtime_01J8Y4M8YF",
-    "agent_credential_thumbprint": "sha256:8100b67f025b63b963929c43b581b122c239e4d6d48daaa4ad06c2099f450f61"
+    "agent_credential_thumbprint": "sha256:8100b67f025b63b963929c43b581b122c239e4d6d48daaa4ad06c2099f450f61",
+    "consumed_at": "2026-07-28T12:20:02Z",
+    "consumption_id": "approval_01J8Y4Q63H:evt_01J8Y4T3T5M1A4FGKMGQ2Q6J7D"
   },
   "decision": {
     "allow": true,
@@ -105,7 +106,7 @@
       "https://source-control.example.internal"
     ],
     "policy_id": "urn:example:policy:mcp-agent-tool-authorization",
-    "policy_version": "1.2.0",
+    "policy_version": "1.3.0",
     "evaluated_at": "2026-07-28T12:20:02Z"
   },
   "result": {
@@ -114,8 +115,8 @@
     "completed_at": "2026-07-28T12:20:04Z"
   },
   "evidence": {
-    "record_digest": "sha256:aff468b609d6b0a288e1cfdd23e37b9228d940de275f688d2fb77c5790646dbf",
-    "digest_profile": "canonical-json-sort-keys-v2",
+    "record_digest": "sha256:3b40dfad4e22345a1e884fe8f5c78c1801a266305e07a8bffd8e4909bd6abb7e",
+    "digest_profile": "restricted-json-sort-keys-v1",
     "evidence_uri": "https://evidence.example.internal/events/evt_01J8Y4T3T5M1A4FGKMGQ2Q6J7D",
     "retention_class": "security",
     "contains_raw_credentials": false,

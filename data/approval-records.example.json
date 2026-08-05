@@ -7,7 +7,7 @@
       "authority_subject_principal_id": "urn:example:principal:subject:01J8Y4K6V9",
       "agent_principal": "spiffe://agents.example.internal/prod/release-agent",
       "environment": "production",
-      "policy_bundle_digest": "sha256:62b9e5005ad6737d80c05f4c1f1ba0f48510c4d68da5a415d323008c850b993e",
+      "policy_bundle_digest": "sha256:0de08f79736aef34cd2a5380177fef7ddbd31b9719dfbe23d583636adb23a64a",
       "approver_principal_id": "urn:example:principal:approver:01J8Y4V1F7",
       "approved_at": "2026-07-28T12:15:00Z",
       "expires_at": "2026-07-28T12:30:00Z",

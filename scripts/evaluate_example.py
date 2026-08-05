@@ -10,11 +10,18 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from canonical_json import CanonicalJSONError, load_canonical_json
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def rfc3339(value: datetime) -> str:
-    return value.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        value.astimezone(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def main() -> None:
@@ -22,8 +29,13 @@ def main() -> None:
     parser.add_argument("--opa", default="opa", help="Path to the OPA executable")
     args = parser.parse_args()
 
-    authz = json.loads((ROOT / "examples/authorization-context.example.json").read_text(encoding="utf-8"))
-    approvals = json.loads((ROOT / "data/approval-records.example.json").read_text(encoding="utf-8"))
+    try:
+        authz = load_canonical_json(
+            ROOT / "examples/authorization-context.example.json"
+        )
+        approvals = load_canonical_json(ROOT / "data/approval-records.example.json")
+    except CanonicalJSONError as exc:
+        raise SystemExit(str(exc)) from exc
 
     now = datetime.now(timezone.utc)
     execution = authz["verified"]["execution"]
@@ -40,18 +52,27 @@ def main() -> None:
         tmp_path = Path(tmp)
         input_path = tmp_path / "input.json"
         approvals_path = tmp_path / "approvals.json"
-        input_path.write_text(json.dumps(authz, indent=2) + "\n", encoding="utf-8")
-        approvals_path.write_text(json.dumps(approvals, indent=2) + "\n", encoding="utf-8")
+        input_path.write_text(
+            json.dumps(authz, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+        )
+        approvals_path.write_text(
+            json.dumps(approvals, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+        )
 
         command = [
             args.opa,
             "eval",
-            "--format", "json",
+            "--format",
+            "json",
             "--fail",
-            "--data", str(ROOT / "policy/mcp-tool-authorization.rego"),
-            "--data", str(ROOT / "data/agent-control.json"),
-            "--data", str(approvals_path),
-            "--input", str(input_path),
+            "--data",
+            str(ROOT / "policy/mcp-tool-authorization.rego"),
+            "--data",
+            str(ROOT / "data/agent-control.json"),
+            "--data",
+            str(approvals_path),
+            "--input",
+            str(input_path),
             "data.agent.mcp.authz.decision",
         ]
         completed = subprocess.run(command, check=True, capture_output=True, text=True)
@@ -80,7 +101,7 @@ def main() -> None:
         "credential_ttl_seconds": 900,
         "expected_audiences": ["https://source-control.example.internal"],
         "policy_id": "urn:example:policy:mcp-agent-tool-authorization",
-        "policy_version": "1.2.0",
+        "policy_version": "1.3.0",
     }
     if decision != expected:
         raise SystemExit(

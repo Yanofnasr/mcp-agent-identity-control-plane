@@ -5,13 +5,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 from pathlib import Path
 from typing import Any
 
-
-def canonical_json(value: Any) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+from canonical_json import CanonicalJSONError, canonical_json_bytes, load_canonical_json
 
 
 def sha256_prefixed(value: bytes) -> str:
@@ -47,10 +44,14 @@ def main() -> None:
     parser.add_argument("--context", type=Path, required=True)
     args = parser.parse_args()
 
-    arguments = json.loads(args.arguments.read_text(encoding="utf-8"))
-    context = json.loads(args.context.read_text(encoding="utf-8"))
+    try:
+        arguments = load_canonical_json(args.arguments)
+        context = load_canonical_json(args.context)
+    except CanonicalJSONError as exc:
+        raise SystemExit(str(exc)) from exc
+
     action = dict(context["verified"]["action"])
-    action["arguments_digest"] = sha256_prefixed(canonical_json(arguments))
+    action["arguments_digest"] = sha256_prefixed(canonical_json_bytes(arguments))
     canonical = canonical_action(action)
     action_hash = sha256_prefixed(canonical.encode("utf-8"))
 

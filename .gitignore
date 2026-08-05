@@ -12,4 +12,15 @@ htmlcov/
 .DS_Store
 .env
 .env.*
+/.npmrc
+/.yarnrc
+/.yarnrc.yml
+/bunfig.toml
+/package*.json
+/pnpm-lock.yaml
+/yarn.lock
+/.gitmodules
 *.zip
+node_modules/
+
+/.omx/

@@ -1,7 +1,7 @@
 digraph AgentIdentityControlPlane {
   graph [
     rankdir=TB,
-    bgcolor="white",
+    bgcolor="#F7F9FC",
     pad="0.38",
     nodesep="0.52",
     ranksep="0.68",
@@ -12,10 +12,11 @@ digraph AgentIdentityControlPlane {
     label="Agent Identity and Delegation Control Plane"
   ];
 
+  // Color is reserved for principals; infrastructure stays neutral slate.
   node [
     shape=box,
     style="rounded,filled",
-    fillcolor="#F8FAFC",
+    fillcolor="#F2F4F7",
     color="#344054",
     penwidth=1.25,
     fontcolor="#101828",
@@ -33,29 +34,40 @@ digraph AgentIdentityControlPlane {
     penwidth=1.15
   ];
 
-  p1 [label="P1 REQUESTING PRINCIPAL\nHuman or invoking service", fillcolor="#EAF2FF"];
-  p2 [label="P2 AUTHORITY SUBJECT\nWhose authority or data is used", fillcolor="#EAF2FF"];
-  p3 [label="P3 AGENT PRINCIPAL\nAttested autonomous workload", fillcolor="#EAF7F0"];
+  p1 [label="P1 REQUESTING PRINCIPAL\nHuman or invoking service", color="#1570EF", fillcolor="#EFF8FF", penwidth=2];
+  p2 [label="P2 AUTHORITY SUBJECT\nWhose authority or data is used", color="#0E9384", fillcolor="#F0FDF9", penwidth=2];
+  p3 [label="P3 AGENT PRINCIPAL\nAttested autonomous workload", color="#6938EF", fillcolor="#F4F3FF", penwidth=2];
 
-  issuer [label="IDENTITY PROVIDER + WORKLOAD ISSUER\nValidate requester and agent credentials", fillcolor="#EEF4FF"];
-  ingress [label="INGRESS PEP\nResolve principals • normalize action\ncompute hash • classify environment", fillcolor="#FFF5E6"];
+  issuer [label="IDENTITY PROVIDER + WORKLOAD ISSUER\nValidate requester and agent credentials"];
+  ingress [label="INGRESS PEP\nResolve principals • normalize action\ncompute hash • classify environment"];
 
-  trusted [shape=folder, label="TRUSTED POLICY DATA\nTools • entitlements • workload + execution issuers\ntarget-audience bindings", fillcolor="#F3F0FF"];
-  pdp [label="POLICY DECISION POINT\nAuthority mode • tool • target • risk\napproval • trusted time", fillcolor="#FFF0F0"];
-  approvals [shape=folder, label="APPROVAL SERVICE\nSingle-use record bound to action, authority, execution,\nenvironment and policy bundle", fillcolor="#F3F0FF"];
+  trusted [shape=folder, label="TRUSTED POLICY DATA\nTools • entitlements • workload + execution issuers\ntarget-audience bindings", fillcolor="#EAECF0"];
+  pdp [label="POLICY DECISION POINT\nAuthority mode • tool • target • risk\napproval • trusted time"];
+  approvals [shape=folder, label="APPROVAL SERVICE\nSingle-use record bound to action, authority, execution,\nenvironment and policy bundle", fillcolor="#EAECF0"];
 
-  broker [label="CREDENTIAL BROKER / STS\nIssue bounded target authority", fillcolor="#EEF4FF"];
-  p4 [label="P4 EXECUTION PRINCIPAL\nIdentity authorized by the target", fillcolor="#EAF7F0"];
+  broker [label="CREDENTIAL BROKER / STS\nIssue bounded target authority"];
+  p4 [label="P4 EXECUTION PRINCIPAL\nIdentity authorized by the target", color="#DC6803", fillcolor="#FFF4ED", penwidth=2];
 
-  mcp [label="MCP GATEWAY: FINAL PEP\nValidate issued credential and exact audience\nrecheck approval and unchanged action", fillcolor="#F2EDFF"];
+  mcp [label="MCP GATEWAY: FINAL PEP\nValidate issued credential and exact audience\nrecheck approval and unchanged action"];
   target [label="TARGET API / RESOURCE\nExecute only the authorized operation"];
 
-  audit [shape=cylinder, label="TAMPER-EVIDENT AUDIT EVENT\nP1 + P2 + P3 + P4 • policy • approval\naction hash • result", fillcolor="#F4F4F4", margin="0.24,0.15"];
+  // The only node that carries every accent, because it records every principal.
+  audit [shape=cylinder, margin="0.24,0.15", label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
+<TR><TD COLSPAN="4"><B>CORRELATED AUDIT EVENT</B></TD></TR>
+<TR>
+<TD BGCOLOR="#EFF8FF"><FONT COLOR="#1570EF"><B>P1</B></FONT></TD>
+<TD BGCOLOR="#F0FDF9"><FONT COLOR="#0E9384"><B>P2</B></FONT></TD>
+<TD BGCOLOR="#F4F3FF"><FONT COLOR="#6938EF"><B>P3</B></FONT></TD>
+<TD BGCOLOR="#FFF4ED"><FONT COLOR="#DC6803"><B>P4</B></FONT></TD>
+</TR>
+<TR><TD COLSPAN="4">policy • approval • action hash • result</TD></TR>
+<TR><TD COLSPAN="4">Digest + external authenticity control</TD></TR>
+</TABLE>>];
   note [shape=note, label="TRUST BOUNDARY\nThe agent proposes the action. It cannot assert verified identity, entitlement,\napproval state, audience, issuer, or time. The reference Rego policy\nevaluates the final gate after credential issuance.", fillcolor="#FFFFFF", color="#98A2B3", fontcolor="#475467", fontsize=9.5];
 
   { rank=same; p1; p2; p3; }
   { rank=same; issuer; ingress; }
-  { rank=same; trusted; pdp; approvals; }
+  { rank=same; trusted; approvals; }
   { rank=same; broker; p4; }
   { rank=same; mcp; target; }
   { rank=same; note; audit; }
@@ -65,17 +77,17 @@ digraph AgentIdentityControlPlane {
   trusted -> pdp [style=dashed, label="controlled facts"];
   approvals -> pdp [style=dashed, label="authoritative record"];
 
-  p1 -> issuer [label="1. authenticate"];
-  p3 -> issuer [label="2. workload proof"];
+  p1 -> issuer [label="1. authenticate", color="#1570EF"];
+  p3 -> issuer [label="2. workload proof", color="#6938EF"];
   issuer -> ingress [label="3. verified identity claims"];
-  p2 -> ingress [label="authority context"];
-  p3 -> ingress [label="proposed action"];
+  p2 -> ingress [label="authority context", color="#0E9384"];
+  p3 -> ingress [label="proposed action", color="#6938EF"];
 
   ingress -> pdp [label="4. pre-issuance decision"];
   pdp -> broker [label="5. credential contract"];
-  broker -> p4 [label="6. short-lived target credential"];
-  p4 -> mcp [label="7. issued credential"];
-  ingress -> mcp [label="canonical action + correlation", constraint=false];
+  broker -> p4 [label="6. short-lived target credential", color="#DC6803"];
+  p4 -> mcp [label="7. issued credential", color="#DC6803"];
+  ingress -> mcp [label="canonical action + correlation", style=dashed, constraint=false];
   mcp -> target [label="8. execute unchanged action"];
   target -> audit [label="9. result"];
   note -> audit [style=invis];

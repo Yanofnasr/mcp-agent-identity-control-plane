@@ -2,16 +2,29 @@
 
 A reference implementation for preserving the identity and authority chain of an AI agent across MCP tool calls.
 
-This vendor-neutral reference implementation models four principals:
+This vendor-neutral reference implementation models four principals. The `P1`-`P4` identifiers are used consistently across the diagrams, the policy source, and this document:
 
 | Principal | Governing question |
 |---|---|
-| Requesting principal | Who initiated the task? |
-| Authority subject | Whose authority or data is being exercised? |
-| Agent principal | Which autonomous workload selected and executed the action? |
-| Execution principal | Which identity did the target authorize? |
+| P1 Requesting principal | Who initiated the task? |
+| P2 Authority subject | Whose authority or data is being exercised? |
+| P3 Agent principal | Which autonomous workload selected and executed the action? |
+| P4 Execution principal | Which identity did the target authorize? |
 
-The package demonstrates action-level policy enforcement, trusted agent credential type, issuer, and attestation profile checks, target-bound token audiences, short-lived execution credentials, verified authority-chain links, approval bound to the final action, single-use approval consume state, and a PII-minimized audit event.
+The package demonstrates action-level policy enforcement, trusted agent credential type, issuer, and attestation profile checks, target-bound token audiences, short-lived execution credentials, verified authority-chain links, approval bound to the final action, single-use approval consumption evidence, and a PII-minimized audit event.
+
+## Principal visual notation
+
+The diagrams use color as a fixed principal notation, never as decoration and never as a security attribute:
+
+| Principal | Accent | Light fill | Placement rule |
+|---|---|---|---|
+| P1 Requesting principal | `#1570EF` | `#EFF8FF` | Upstream requester path |
+| P2 Authority subject | `#0E9384` | `#F0FDF9` | Upstream authority path |
+| P3 Agent principal | `#6938EF` | `#F4F3FF` | Upstream workload path |
+| P4 Execution principal | `#DC6803` | `#FFF4ED` | Begins at the broker-issued credential |
+
+Infrastructure carries no principal color at all: every non-principal node uses the neutral slate border `#344054` with a neutral `#F2F4F7` fill, and trusted data stores use `#EAECF0`, all on the series background `#F7F9FC`. The correlated audit event is the single node that carries all four accents, because it is the one record that names all four principals. Every accent is paired with its `P1`-`P4` label and a fixed position, so the diagrams never depend on color perception alone.
 
 ## Security boundary
 
@@ -30,6 +43,12 @@ The final enforcement point reconstructs `verified.action` from the live invocat
 
 The agent must not assert its own verified identity, delegation state, approval status, production entitlement, accepted audience, trusted issuer, authority-chain flag, consumed approval state, or evaluation time.
 
+## MCP boundary
+
+These schemas are application-level control envelopes, not MCP wire messages. In particular, `request.session_id` is a local correlation identifier; it is not a protocol session or the removed `Mcp-Session-Id` header from MCP `2026-07-28`.
+
+Treat MCP `clientInfo` and `serverInfo` as self-declared protocol metadata and tool annotations as behavioral hints. None is identity or policy evidence unless authenticated or independently anchored to a trusted source. A policy enforcement point may retain them for correlation, but it must derive the `verified` envelope from authenticated credentials, controlled configuration, attestation, and independently verified delegation evidence.
+
 ## Two-stage enforcement
 
 A production flow should use two related decisions:
@@ -37,9 +56,9 @@ A production flow should use two related decisions:
 1. **Pre-issuance decision:** determine whether a credential may be requested and return the required authority mode, audience, credential profile, maximum lifetime, and approval contract.
 2. **Final enforcement decision:** validate the actual issued credential, confirm the exact target audience, recheck the approval and unchanged action, then allow or deny the MCP tool call.
 
-The Rego entry point in this repository implements the **final enforcement decision**. The returned credential profile and lifetime describe the policy contract and support audit comparison.
+The Rego entry point in this repository implements the **final enforcement decision**. The returned credential profile and lifetime describe the policy contract and support audit comparison. The policy evaluates a trusted envelope assembled by the policy enforcement point (PEP); it does not itself verify cryptographic token proofs, mTLS binding, DPoP replay controls, attestation evidence, or delegation artifacts.
 
-Approvals must be consumed atomically by the authoritative approval service or policy enforcement point. If approval and execution can race each other, you reopen a TOCTOU window between authorization and tool use.
+Approvals must be consumed atomically by the authoritative approval service or policy enforcement point. If approval and execution can race each other, you reopen a TOCTOU window between authorization and tool use. Successful audit events therefore record both `consumed_at` and a stable `consumption_id` as evidence of that transition; the JSON event does not implement the transaction.
 
 ## Repository layout
 
@@ -68,19 +87,24 @@ Approvals must be consumed atomically by the authoritative approval service or p
 │   ├── agent-action-audit-event.schema.json
 │   └── authorization-context.schema.json
 ├── scripts/
+│   ├── canonical_json.py
 │   ├── evaluate_example.py
 │   ├── hash_action.py
 │   ├── package.sh
 │   ├── update_derived_values.py
 │   ├── validate.sh
 │   └── validate_artifacts.py
+├── .github/dependabot.yml
+├── .github/workflows/release.yml
 ├── .github/workflows/validate.yml
+├── .gitignore
 ├── CHANGELOG.md
 ├── LICENSE
 ├── MANIFEST.sha256
 ├── Makefile
 ├── README.md
 ├── requirements-dev.txt
+├── SECURITY.md
 ├── VALIDATION.md
 └── VERSION
 ```
@@ -94,6 +118,7 @@ The reference Rego policy denies a tool call unless all applicable controls pass
 - The execution context links the authority subject and agent actor to the verified identity chain.
 - The agent has a trusted workload credential type, issuer, attestation profile, workload identity, and entitlement for the environment.
 - The final `verified.action` is reconstructed from the live invocation at the PEP and is not caller-supplied duplicate state.
+- Every SHA-256 field uses the exact `sha256:` prefix followed by 64 lowercase hexadecimal characters.
 - The method, tool, and normalized target are allowed by trusted policy data.
 - Production write permission comes from trusted policy data, not request input.
 - The action hash is recomputed from the canonical action profile.
@@ -102,15 +127,25 @@ The reference Rego policy denies a tool call unless all applicable controls pass
 - The credential is sender-constrained using an allowed mechanism.
 - The credential is active, unexpired, and within the tool-specific maximum lifetime.
 - A configured credential profile exists for the authority mode.
-- Required approval is present, unexpired, single-use, unconsumed, independently approved where configured, and bound to the action, identities, environment, agent trust material, and policy bundle.
+- Required approval is present, unexpired, single-use, unconsumed at decision time, independently approved where configured, and bound to the action, identities, environment, agent trust material, and policy bundle.
 
 ## Action hash profile
 
-The example canonicalizes tool arguments as compact JSON with lexicographically sorted object keys, then computes:
+The example canonicalizes tool arguments with the local `restricted-json-sort-keys-v1` profile, then computes:
 
 ```text
 arguments_digest = "sha256:" + SHA256(canonical_json(arguments))
 ```
+
+The profile is intentionally narrow so independent implementations do not drift:
+
+- UTF-8 only; lone Unicode surrogates are invalid.
+- Object member names are sorted lexicographically by their Unicode scalar-value (code-point) sequences, with no insignificant whitespace.
+- Unicode is not normalized; canonically equivalent strings remain distinct inputs and produce distinct bytes.
+- Duplicate object keys are rejected during parsing.
+- Strings use standard JSON escaping for `"`, `\`, and control characters; non-ASCII scalar values are emitted directly, not ASCII-escaped.
+- Floating-point numbers, `NaN`, and `Infinity` are rejected.
+- Integers are allowed only within the exact IEEE-754 safe range `[-9007199254740991, 9007199254740991]`.
 
 The action is serialized exactly as:
 
@@ -130,11 +165,15 @@ The canonical action hash is:
 canonical_hash = "sha256:" + SHA256(UTF8(canonical_action_string))
 ```
 
+Both action digests, and every other SHA-256 value covered by the contract, must match `^sha256:[a-f0-9]{64}$` exactly.
+
 Every line-serialized action field must be non-empty and free of carriage returns and line feeds. The schemas, helpers, and Rego gate all enforce that invariant so field boundaries cannot be made ambiguous.
 
 The trusted approval record binds this action hash to the requester, authority subject, agent definition ID, agent version, runtime instance ID, agent credential thumbprint, environment, and policy bundle digest. It also pins the authority mode, execution principal, target audience, sender constraint, and credential profile. This prevents approval for one operation or execution contract from authorizing another.
 
-The companion audit event uses `canonical-json-sort-keys-v2` for its full-event digest.
+The companion audit event uses `restricted-json-sort-keys-v1` for its full-event digest. The digest is an integrity checksum, not proof of origin or tamper evidence by itself; production systems must sign or MAC the event, or commit it to a controlled append-only or transparency log.
+
+This is a local restricted profile for the checked-in examples, not a general JSON interoperability standard. When interoperable number serialization matters across heterogeneous systems, prefer RFC 8785 JSON Canonicalization Scheme (JCS), or deterministic CBOR with a documented numeric profile where a binary canonical form is acceptable.
 
 Reproduce the checked-in values:
 
@@ -211,11 +250,11 @@ The CI workflow pins OPA **v1.18.2** and verifies the Linux AMD64 static binary 
     "https://source-control.example.internal"
   ],
   "policy_id": "urn:example:policy:mcp-agent-tool-authorization",
-  "policy_version": "1.2.0"
+  "policy_version": "1.3.0"
 }
 ```
 
-The audit event records this decision unchanged and adds the trusted `evaluated_at` timestamp.
+The audit event records this decision unchanged, adds the trusted `evaluated_at` timestamp, and records approval consumption for successful executions.
 
 ## Negative policy tests
 
@@ -232,6 +271,7 @@ The Rego suite explicitly verifies denial for:
 - Authority-chain mismatch
 - Mismatched delegated subject or agent actor
 - Action-hash mismatch
+- Non-hexadecimal SHA-256 fields in the verified policy, agent, or execution context
 - Newline-bearing canonical action fields
 - Unauthorized target
 - Untrusted issuer
@@ -271,7 +311,9 @@ Create a clean archive outside the source tree:
 make package
 ```
 
-The packaging script first requires the source tree and checked-in manifest to be current. It stages only allowlisted files, regenerates derived values and diagrams inside the staging area, and fails if any generated artifact differs from source. It then creates and verifies the staged manifest, writes a deterministic-content ZIP, unpacks it, and verifies the extracted tree against the manifest and allowlist again. Packaging never repairs or rewrites tracked source files.
+The packaging script first requires the source tree and checked-in manifest to be current. It stages only allowlisted files, regenerates derived values and diagrams inside the staging area, and fails if any generated artifact differs from source. It then creates and verifies the staged manifest, normalizes archive timestamps in UTC using the release date by default, writes a deterministic-content ZIP, unpacks it, and verifies the extracted tree against the manifest and allowlist again. Packaging never repairs or rewrites tracked source files.
+
+Graphviz is required, because packaging re-renders the diagrams to prove the checked-in PNG and SVG still match their `.dot` sources. Graphviz output varies between versions, so that comparison is a local developer gate rather than a release dependency. Setting `PACKAGE_ALLOW_MISSING_GRAPHVIZ=1` skips only that comparison, which is what the release workflow does after it has already verified the checked-in manifest. The archive is byte-identical either way, because `MANIFEST.sha256` pins every shipped file.
 
 ## Production hardening
 
@@ -280,6 +322,7 @@ This package is a reference, not a drop-in authorization service. A production i
 - Cryptographically validate workload, user, and execution credentials, including the workload credential type, issuer, and attestation profile, before constructing `input.verified`.
 - Verify delegation claims or equivalent broker evidence before marking `authority_chain_verified` true.
 - Normalize targets and arguments before hashing and reject ambiguous representations.
+- Record the MCP protocol version observed on each request, active extensions and authorization mode, and propagated trace context when those facts are needed for forensic correlation; do not promote self-reported metadata into trusted identity.
 - Load policy and trusted data from signed bundles or an equivalently controlled distribution channel.
 - Retrieve approval records from an authoritative service or verify signed approval assertions.
 - Protect against approval replay using single-use state or execution counters where the action is non-idempotent.
@@ -289,6 +332,29 @@ This package is a reference, not a drop-in authorization service. A production i
 - Define fail-closed behavior for policy, identity, approval, credential broker, and audit-service failures.
 - Map target audiences to the actual resource identifiers used by the authorization server and target platform.
 - Perform privacy, retention, and access-control review before recording prompt or tool evidence.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for the supported versions, the reporting route, and the explicit
+in-scope and out-of-scope boundaries. Report privately through the repository **Security** tab
+rather than by opening an issue.
+
+The supply chain around this package is verified on every run, so a regression fails the build
+instead of shipping:
+
+- Every GitHub Action is pinned to an immutable commit SHA.
+- The validation workflow token is limited to `contents: read`. The release job elevates only to
+  `contents`, `id-token`, and `attestations` write, and only to publish.
+- The OPA binary is checked against a pinned SHA-256 digest before it executes.
+- The Python graph is exact-pinned and hash-locked to reviewed binary wheels.
+- Release archives are byte-reproducible and carry a Sigstore-backed provenance attestation.
+
+Verify a published archive against its attestation:
+
+```bash
+gh attestation verify mcp-agent-identity-reference-<version>.zip \
+  --repo <owner>/mcp-agent-identity-control-plane
+```
 
 ## Privacy
 

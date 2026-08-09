@@ -57,6 +57,24 @@ patch_allowed_authority_modes(modes) := object.union(data.agent_control, {
 	}),
 })
 
+replace_tool_config(tool_name, replacement) := patched_control if {
+	server_name := base_input.verified.action.mcp_server
+	server := data.agent_control.servers[server_name]
+	tools := object.union(
+		object.remove(server.tools, [tool_name]),
+		{tool_name: replacement},
+	)
+	patched_server := object.union(object.remove(server, ["tools"]), {"tools": tools})
+	servers := object.union(
+		object.remove(data.agent_control.servers, [server_name]),
+		{server_name: patched_server},
+	)
+	patched_control := object.union(
+		object.remove(data.agent_control, ["servers"]),
+		{"servers": servers},
+	)
+}
+
 valid_decision := decision if {
 	decision := authz.decision
 		with input as base_input
@@ -85,7 +103,7 @@ test_valid_production_merge if {
 	valid_decision.credential_ttl_seconds == 900
 	valid_decision.expected_audiences == ["https://source-control.example.internal"]
 	valid_decision.policy_id == "urn:example:policy:mcp-agent-tool-authorization"
-	valid_decision.policy_version == "1.3.0"
+	valid_decision.policy_version == "1.3.1"
 }
 
 test_allow_decision_shape_includes_authority_mode_and_reason_codes if {
@@ -407,6 +425,34 @@ test_independent_approval_cannot_be_self_approved if {
 	"APPROVAL_SEPARATION_INVALID" in result.deny_reasons
 }
 
+test_independent_approval_cannot_be_agent_approved if {
+	records := patch_approval_records({
+		"approver_principal_id": base_input.verified.agent.agent_principal,
+	})
+
+	result := authz.decision
+		with input as base_input
+		with data.approval_records as records
+		with time.now_ns as mock_now_ns
+
+	result.allow == false
+	"APPROVAL_SEPARATION_INVALID" in result.deny_reasons
+}
+
+test_independent_approval_cannot_be_execution_principal_approved if {
+	records := patch_approval_records({
+		"approver_principal_id": base_input.verified.execution.principal_id,
+	})
+
+	result := authz.decision
+		with input as base_input
+		with data.approval_records as records
+		with time.now_ns as mock_now_ns
+
+	result.allow == false
+	"APPROVAL_SEPARATION_INVALID" in result.deny_reasons
+}
+
 test_approval_policy_bundle_mismatch_is_denied if {
 	records := patch_approval_records({
 		"policy_bundle_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -526,6 +572,54 @@ test_missing_credential_profile_is_denied if {
 
 	result.allow == false
 	"CREDENTIAL_PROFILE_NOT_CONFIGURED" in result.deny_reasons
+}
+
+test_missing_tool_write_flag_is_denied if {
+	tool := object.remove(
+		data.agent_control.servers["source-control"].tools.merge_pull_request,
+		["write"],
+	)
+	patched_control := replace_tool_config("merge_pull_request", tool)
+
+	result := authz.decision
+		with input as base_input
+		with data.agent_control as patched_control
+		with time.now_ns as mock_now_ns
+
+	result.allow == false
+	"TOOL_CONFIG_INVALID" in result.deny_reasons
+}
+
+test_missing_tool_requires_approval_flag_is_denied if {
+	tool := object.remove(
+		data.agent_control.servers["source-control"].tools.merge_pull_request,
+		["requires_approval"],
+	)
+	patched_control := replace_tool_config("merge_pull_request", tool)
+
+	result := authz.decision
+		with input as base_input
+		with data.agent_control as patched_control
+		with time.now_ns as mock_now_ns
+
+	result.allow == false
+	"TOOL_CONFIG_INVALID" in result.deny_reasons
+}
+
+test_invalid_tool_approval_mode_is_denied if {
+	tool := object.union(
+		data.agent_control.servers["source-control"].tools.merge_pull_request,
+		{"approval_mode": "indepndent"},
+	)
+	patched_control := replace_tool_config("merge_pull_request", tool)
+
+	result := authz.decision
+		with input as base_input
+		with data.agent_control as patched_control
+		with time.now_ns as mock_now_ns
+
+	result.allow == false
+	"TOOL_CONFIG_INVALID" in result.deny_reasons
 }
 
 test_production_write_entitlement_cannot_be_self_asserted if {

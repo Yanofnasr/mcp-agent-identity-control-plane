@@ -49,4 +49,4 @@ verified:
     canonical_hash: sha256:3c2411af1c56c81064e144686779398c89bc0658cec3ea70ce74730173787d7d
   context:
     environment: production
-    policy_bundle_digest: sha256:0de08f79736aef34cd2a5380177fef7ddbd31b9719dfbe23d583636adb23a64a
+    policy_bundle_digest: sha256:2eefbd6eab6222a90ea22d3d235f892dc5762bf2d6dba52e237622942f5d0cee

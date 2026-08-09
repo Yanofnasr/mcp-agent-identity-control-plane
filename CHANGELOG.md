@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.1 - 2026-08-09
+
+- Made trusted tool configuration fail closed unless write classification, approval requirements and mode, risk tier, credential lifetime, and credential profiles are explicit and valid.
+- Extended independent-approval separation across all four principals so neither the agent nor the execution principal can approve its own critical action.
+- Applied the validation workflow's checkout, Python, hash-lock, and OPA integrity assertions to the privileged release workflow.
+- Updated the pinned GitHub Actions from `actions/checkout` 6.0.2 to 7.0.1 and `actions/setup-python` 6.2.0 to 7.0.0.
+- Expanded the Rego regression suite from 36 to 41 cases for malformed tool configuration and P3/P4 self-approval attempts.
+- Canonicalized and verified package file modes so archive bytes do not depend on checkout permissions or the caller's umask.
+
 ## 1.3.0 - 2026-08-05
 
 - Added schema-valid blocked/denied audit events without requiring fabricated verified credential evidence.

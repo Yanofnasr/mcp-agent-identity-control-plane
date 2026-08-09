@@ -1,6 +1,6 @@
 # Validation status
 
-Release **1.3.0** is dated **2026-08-05**. This validation record was last executed on **2026-08-09**.
+Release **1.3.1** is dated **2026-08-09**. This validation record was last executed on **2026-08-09**.
 
 ## Executed locally
 
@@ -13,10 +13,10 @@ The following gates are executed by `make validate-structure`:
 - Approval-to-action, identity, environment, and policy-bundle binding checks
 - Execution-to-authority-subject and execution-to-agent-actor link checks
 - Exact target-to-audience validation
-- Issuer, sender constraint, credential lifetime, entitlement, and production-write checks
+- Issuer, sender constraint, credential lifetime, entitlement, production-write, and fail-closed tool-configuration checks
 - Allow and deny audit-event lifecycle consistency, approval-consumption evidence, and record-digest reproduction
 - Negative schema checks for caller-supplied time, entitlements, approval state, multiple audiences, and missing identity bindings
-- Source package allowlist, README repository-tree completeness, prohibited-file, and direct-email checks
+- Source package allowlist, canonical archive-mode, README repository-tree completeness, prohibited-file, and direct-email checks
 - CI pinning, release-metadata consistency, UTC archive normalization, and release-command checks
 - Security-policy completeness, Dependabot ecosystem scoping, and release-workflow privilege, attestation, and tag-to-version checks
 
@@ -31,9 +31,9 @@ opa test policy data --fail-on-empty -v
 python3 scripts/evaluate_example.py
 ```
 
-Result: **36/36 Rego tests passed**, strict compilation passed, and the live allow-path decision matched the checked-in 1.3 contract.
+Result: **41/41 Rego tests passed**, strict compilation passed, and the live allow-path decision matched the checked-in 1.3 contract.
 
-Two release archives invoked under distinct caller time zones were compared byte-for-byte. The staged tree and extracted ZIP were each checked with `sha256sum --check --strict MANIFEST.sha256` and the explicit package allowlist. The final archive hash is recorded in the release handoff.
+Release archives built from source trees with deliberately different permissions and caller time zones were compared byte-for-byte. The staged tree and extracted ZIP were each checked with `sha256sum --check --strict MANIFEST.sha256`, the explicit package allowlist, and the canonical file-mode contract. The final archive hash is recorded in the release handoff.
 
 ## Continuous integration
 

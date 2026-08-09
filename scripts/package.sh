@@ -74,6 +74,7 @@ for relative in "${REGENERATED_ARTIFACTS[@]}"; do
   fi
 done
 
+python3 scripts/validate_artifacts.py normalize-package-modes "$STAGE"
 python3 scripts/validate_artifacts.py write-manifest "$STAGE"
 python3 scripts/validate_artifacts.py verify-package-tree "$STAGE"
 (
@@ -81,8 +82,8 @@ python3 scripts/validate_artifacts.py verify-package-tree "$STAGE"
   sha256sum --check --strict MANIFEST.sha256
 )
 
-# Default reproducible archive mtime: 2026-08-05 UTC.
-: "${SOURCE_DATE_EPOCH:=1785888000}"
+# Default reproducible archive mtime: 2026-08-09 UTC.
+: "${SOURCE_DATE_EPOCH:=1786233600}"
 find "$STAGE" -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
 mkdir -p "$(dirname "$OUT")"
 rm -f "$OUT"

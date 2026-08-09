@@ -232,6 +232,31 @@ tool_known if {
 	count(tool_config) > 0
 }
 
+credential_profiles_valid if {
+	profiles := tool_config.credential_profiles
+	type_name(profiles) == "object"
+	count(profiles) > 0
+	every mode, profile in profiles {
+		mode in {"user_delegated", "agent_own", "brokered_service"}
+		type_name(profile) == "string"
+		profile != ""
+	}
+}
+
+tool_config_valid if {
+	tool_known
+	type_name(tool_config) == "object"
+	type_name(tool_config.write) == "boolean"
+	type_name(tool_config.requires_approval) == "boolean"
+	tool_config.approval_mode in {"none", "confirmation", "independent"}
+	tool_config.risk_tier in {"low", "medium", "high", "critical"}
+	type_name(tool_config.max_credential_ttl_seconds) == "number"
+	tool_config.max_credential_ttl_seconds > 0
+	tool_config.max_credential_ttl_seconds <= 86400
+	tool_config.max_credential_ttl_seconds % 1 == 0
+	credential_profiles_valid
+}
+
 tool_allowed if {
 	tool_known
 	action.tool in object.get(server_entitlement, "allowed_tools", [])
@@ -262,12 +287,12 @@ production_write_allowed if {
 
 production_write_allowed if {
 	context.environment == "production"
-	object.get(tool_config, "write", false) == false
+	tool_config.write == false
 }
 
 production_write_allowed if {
 	context.environment == "production"
-	object.get(tool_config, "write", false) == true
+	tool_config.write == true
 	object.get(server_entitlement, "production_write_allowed", false) == true
 }
 
@@ -351,12 +376,14 @@ execution_identity_valid if {
 }
 
 requires_approval if {
-	object.get(tool_config, "requires_approval", false) == true
+	tool_config_valid
+	tool_config.requires_approval == true
 }
 
 requires_approval if {
+	tool_config_valid
 	context.environment == "production"
-	object.get(tool_config, "write", false) == true
+	tool_config.write == true
 }
 
 approval_record_present if {
@@ -398,14 +425,16 @@ approval_approver_present if {
 }
 
 approval_separation_valid if {
-	object.get(tool_config, "approval_mode", "confirmation") != "independent"
+	tool_config.approval_mode != "independent"
 }
 
 approval_separation_valid if {
-	object.get(tool_config, "approval_mode", "confirmation") == "independent"
+	tool_config.approval_mode == "independent"
 	approval_approver_present
 	approval_record.approver_principal_id != requester.principal_id
 	approval_record.approver_principal_id != authority_subject.principal_id
+	approval_record.approver_principal_id != agent.agent_principal
+	approval_record.approver_principal_id != execution.principal_id
 }
 
 approval_single_use_valid if {
@@ -445,6 +474,7 @@ allow if {
 	action_canonicalizable
 	action_hash_valid
 	method_allowed
+	tool_config_valid
 	tool_allowed
 	target_allowed
 	environment_allowed
@@ -511,6 +541,10 @@ deny_reasons contains "METHOD_NOT_ALLOWED" if {
 
 deny_reasons contains "TOOL_NOT_ALLOWED" if {
 	not tool_allowed
+}
+
+deny_reasons contains "TOOL_CONFIG_INVALID" if {
+	not tool_config_valid
 }
 
 deny_reasons contains "TARGET_NOT_ALLOWED" if {

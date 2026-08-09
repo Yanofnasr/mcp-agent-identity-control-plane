@@ -101,7 +101,7 @@ def main() -> None:
         "credential_ttl_seconds": 900,
         "expected_audiences": ["https://source-control.example.internal"],
         "policy_id": "urn:example:policy:mcp-agent-tool-authorization",
-        "policy_version": "1.3.0",
+        "policy_version": "1.3.1",
     }
     if decision != expected:
         raise SystemExit(

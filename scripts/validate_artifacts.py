@@ -8,7 +8,9 @@ import copy
 import hashlib
 import json
 import re
+import stat
 import sys
+import tempfile
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 from pathlib import Path
@@ -70,6 +72,16 @@ PACKAGE_REQUIRED_FILES = frozenset(
 )
 
 MANIFEST_EXCLUDED_FILES = {"MANIFEST.sha256"}
+
+PACKAGE_EXECUTABLE_FILES = frozenset(
+    {
+        "scripts/evaluate_example.py",
+        "scripts/hash_action.py",
+        "scripts/package.sh",
+        "scripts/update_derived_values.py",
+        "scripts/validate.sh",
+    }
+)
 
 IGNORED_DIR_NAMES = {
     ".mypy_cache",
@@ -139,6 +151,8 @@ EXPECTED_POLICY_TESTS = frozenset(
         "test_untrusted_agent_credential_issuer_is_denied",
         "test_untrusted_agent_attestation_profile_is_denied",
         "test_independent_approval_cannot_be_self_approved",
+        "test_independent_approval_cannot_be_agent_approved",
+        "test_independent_approval_cannot_be_execution_principal_approved",
         "test_approval_policy_bundle_mismatch_is_denied",
         "test_approval_runtime_build_binding_mismatch_is_denied",
         "test_empty_approver_identity_is_denied",
@@ -146,6 +160,9 @@ EXPECTED_POLICY_TESTS = frozenset(
         "test_consumed_approval_is_denied",
         "test_non_single_use_approval_is_denied",
         "test_missing_credential_profile_is_denied",
+        "test_missing_tool_write_flag_is_denied",
+        "test_missing_tool_requires_approval_flag_is_denied",
+        "test_invalid_tool_approval_mode_is_denied",
         "test_production_write_entitlement_cannot_be_self_asserted",
         "test_agent_own_read_only_access_allowed",
         "test_brokered_service_read_only_access_allowed",
@@ -330,6 +347,28 @@ def render_manifest(root: Path) -> str:
     return "\n".join(lines) + "\n"
 
 
+def expected_package_mode(relative: str) -> int:
+    return 0o755 if relative in PACKAGE_EXECUTABLE_FILES else 0o644
+
+
+def normalize_package_modes(root: Path) -> None:
+    for relative in package_files_for_root(root, include_manifest=True):
+        (root / relative).chmod(expected_package_mode(relative))
+
+
+def validate_package_modes(root: Path) -> None:
+    mismatches = []
+    for relative in package_files_for_root(root, include_manifest=True):
+        actual = stat.S_IMODE((root / relative).stat().st_mode)
+        expected = expected_package_mode(relative)
+        if actual != expected:
+            mismatches.append(f"{relative}: {actual:#06o} != {expected:#06o}")
+    if mismatches:
+        raise AssertionError(
+            "Package file modes are not canonical: " + ", ".join(mismatches)
+        )
+
+
 def check_manifest(root: Path) -> None:
     manifest_path = root / "MANIFEST.sha256"
     if not manifest_path.is_file():
@@ -353,6 +392,7 @@ def verify_package_tree(root: Path) -> None:
         discover_files(root, apply_source_ignores=False), context=str(root)
     )
     check_manifest(root)
+    validate_package_modes(root)
 
 
 def build_schema_validator(
@@ -507,6 +547,42 @@ def validate_package_allowlist_self_tests() -> None:
         raise AssertionError(
             "Source ignore self-test incorrectly ignored a packageable file"
         )
+
+    if not PACKAGE_EXECUTABLE_FILES <= PACKAGE_REQUIRED_FILES:
+        raise AssertionError(
+            "Executable package files must be present in the allowlist"
+        )
+
+    with tempfile.TemporaryDirectory(prefix="mcp-package-mode-test.") as directory:
+        root = Path(directory)
+        fixtures = {
+            "README.md": 0o777,
+            "scripts/package.sh": 0o600,
+        }
+        for fixture_relative, mode in fixtures.items():
+            path = root / fixture_relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(fixture_relative, encoding="utf-8")
+            path.chmod(mode)
+        normalize_package_modes(root)
+        validate_package_modes(root)
+        for fixture_relative in fixtures:
+            actual = stat.S_IMODE((root / fixture_relative).stat().st_mode)
+            expected = expected_package_mode(fixture_relative)
+            if actual != expected:
+                raise AssertionError(
+                    f"Package mode self-test failed for {fixture_relative}: "
+                    f"{actual:#06o} != {expected:#06o}"
+                )
+        executable = root / "scripts/package.sh"
+        executable.chmod(0o4755)
+        try:
+            validate_package_modes(root)
+        except AssertionError as exc:
+            if "Package file modes are not canonical" not in str(exc):
+                raise
+        else:
+            raise AssertionError("Package mode self-test accepted a setuid file")
     for relative in (
         Path(".env"),
         Path(".env.production"),
@@ -750,6 +826,123 @@ def validate_release_metadata() -> None:
         )
 
 
+PINNED_ACTION_SHA = re.compile(r"^[^@]+@[0-9a-f]{40}$")
+APPROVED_CHECKOUT_ACTION = (
+    "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+)
+APPROVED_SETUP_PYTHON_ACTION = (
+    "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97"
+)
+APPROVED_OPA_VERSION = "1.18.2"
+APPROVED_OPA_SHA256 = (
+    "9903e5125ac281104f2c4b7371d10cc3b74a98933743fcbfc174f9bf0ab20de8"
+)
+
+
+def assert_actions_are_sha_pinned(steps: list[dict[str, Any]], *, workflow: str) -> None:
+    for step in steps:
+        uses = step.get("uses")
+        if uses and not PINNED_ACTION_SHA.match(uses):
+            raise AssertionError(
+                f"{workflow} uses an action that is not pinned to a commit SHA: {uses}"
+            )
+
+
+def validate_ci_job_hardening(
+    job: dict[str, Any], workflow_text: str, *, workflow: str
+) -> None:
+    steps = job.get("steps", [])
+    assert_actions_are_sha_pinned(steps, workflow=workflow)
+    if job.get("runs-on") != "ubuntu-latest":
+        raise AssertionError(f"{workflow} must run on ubuntu-latest")
+
+    checkout_step = next(
+        (
+            step
+            for step in steps
+            if step.get("uses", "").startswith("actions/checkout@")
+        ),
+        None,
+    )
+    if checkout_step is None:
+        raise AssertionError(f"{workflow} is missing the checkout step")
+    if checkout_step.get("uses") != APPROVED_CHECKOUT_ACTION:
+        raise AssertionError(
+            f"{workflow} actions/checkout must use the approved commit SHA"
+        )
+    if checkout_step.get("with", {}).get("persist-credentials") is not False:
+        raise AssertionError(f"{workflow} checkout must disable persist-credentials")
+
+    setup_python = next(
+        (
+            step
+            for step in steps
+            if step.get("uses", "").startswith("actions/setup-python@")
+        ),
+        None,
+    )
+    if setup_python is None:
+        raise AssertionError(f"{workflow} is missing the setup-python step")
+    if setup_python.get("uses") != APPROVED_SETUP_PYTHON_ACTION:
+        raise AssertionError(
+            f"{workflow} actions/setup-python must use the approved commit SHA"
+        )
+
+    setup_python_with = setup_python.get("with", {})
+    if setup_python_with.get("python-version") != "3.12":
+        raise AssertionError(f"{workflow} must validate with Python 3.12")
+    if setup_python_with.get("cache") != "pip":
+        raise AssertionError(f"{workflow} must use setup-python's pip cache")
+    cache_path = setup_python_with.get("cache-dependency-path")
+    if cache_path != "requirements-dev.txt":
+        raise AssertionError(
+            f"{workflow} must key its pip cache from requirements-dev.txt"
+        )
+    if not (SCRIPT_ROOT / cache_path).is_file():
+        raise AssertionError(
+            f"{workflow} cache-dependency-path does not exist: {cache_path}"
+        )
+
+    env = job.get("env", {})
+    if env.get("OPA_VERSION") != APPROVED_OPA_VERSION:
+        raise AssertionError(f"{workflow} must pin OPA {APPROVED_OPA_VERSION}")
+    if env.get("OPA_LINUX_AMD64_STATIC_SHA256") != APPROVED_OPA_SHA256:
+        raise AssertionError(f"{workflow} must pin the approved OPA SHA-256 digest")
+
+    install_step = next(
+        (step for step in steps if step.get("name") == "Install Python validators"),
+        None,
+    )
+    if install_step is None:
+        raise AssertionError(f"{workflow} is missing the Python validator install step")
+    install_run = str(install_step.get("run", ""))
+    required_install_fragments = (
+        "python -m pip install",
+        "--disable-pip-version-check",
+        "--only-binary=:all:",
+        "--require-hashes",
+        "--requirement requirements-dev.txt",
+    )
+    if not all(fragment in install_run for fragment in required_install_fragments):
+        raise AssertionError(
+            f"{workflow} must install validators from hash-locked binary wheels"
+        )
+    if "sha256sum --check --strict" not in workflow_text:
+        raise AssertionError(
+            f"{workflow} must verify the downloaded OPA binary SHA-256 digest"
+        )
+    if re.search(r"run:\s*make manifest\s*(?:\n|$)", workflow_text):
+        raise AssertionError(
+            f"{workflow} must not regenerate MANIFEST.sha256 before validating it"
+        )
+    if "make manifest-check" not in workflow_text:
+        raise AssertionError(
+            f"{workflow} must explicitly check the checked-in MANIFEST.sha256"
+        )
+    if "make validate" not in workflow_text:
+        raise AssertionError(f"{workflow} must run make validate")
+
+
 def validate_workflow() -> None:
     workflow_path = SCRIPT_ROOT / ".github/workflows/validate.yml"
     workflow_text = workflow_path.read_text(encoding="utf-8")
@@ -761,121 +954,9 @@ def validate_workflow() -> None:
         )
 
     validate_job = workflow.get("jobs", {}).get("validate", {})
-    steps = validate_job.get("steps", [])
-    assert_actions_are_sha_pinned(steps, workflow="Validate workflow")
-    if validate_job.get("runs-on") != "ubuntu-latest":
-        raise AssertionError("Workflow must run on ubuntu-latest")
-
-    checkout_step = next(
-        (
-            step
-            for step in steps
-            if step.get("uses", "").startswith("actions/checkout@")
-        ),
-        None,
+    validate_ci_job_hardening(
+        validate_job, workflow_text, workflow="Validate workflow"
     )
-    if checkout_step is None:
-        raise AssertionError("Workflow is missing the checkout step")
-    if (
-        checkout_step.get("uses")
-        != "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd"
-    ):
-        raise AssertionError(
-            "actions/checkout must be pinned to the approved commit SHA"
-        )
-    if checkout_step.get("with", {}).get("persist-credentials") is not False:
-        raise AssertionError("actions/checkout must disable persist-credentials")
-
-    setup_python = next(
-        (
-            step
-            for step in steps
-            if step.get("uses", "").startswith("actions/setup-python@")
-        ),
-        None,
-    )
-    if setup_python is None:
-        raise AssertionError("Workflow is missing the setup-python step")
-    if (
-        setup_python.get("uses")
-        != "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405"
-    ):
-        raise AssertionError(
-            "actions/setup-python must be pinned to the approved commit SHA"
-        )
-    if setup_python.get("with", {}).get("python-version") != "3.12":
-        raise AssertionError("Workflow must validate with Python 3.12")
-
-    # setup-python only globs requirements.txt/pyproject.toml unless told otherwise.
-    setup_python_with = setup_python.get("with", {})
-    if setup_python_with.get("cache"):
-        cache_path = setup_python_with.get("cache-dependency-path")
-        if not cache_path:
-            raise AssertionError(
-                "setup-python enables caching without cache-dependency-path; "
-                "the default glob does not match requirements-dev.txt"
-            )
-        if not (SCRIPT_ROOT / str(cache_path)).is_file():
-            raise AssertionError(
-                f"setup-python cache-dependency-path does not exist: {cache_path}"
-            )
-
-    env = validate_job.get("env", {})
-    if env.get("OPA_VERSION") != "1.18.2":
-        raise AssertionError("Workflow must pin OPA 1.18.2")
-    if (
-        env.get("OPA_LINUX_AMD64_STATIC_SHA256")
-        != "9903e5125ac281104f2c4b7371d10cc3b74a98933743fcbfc174f9bf0ab20de8"
-    ):
-        raise AssertionError("Workflow must pin the approved OPA SHA-256 digest")
-
-    if re.search(r"run:\s*make manifest\s*(?:\n|$)", workflow_text):
-        raise AssertionError(
-            "Workflow must not regenerate MANIFEST.sha256 before validating it"
-        )
-    if "make manifest-check" not in workflow_text:
-        raise AssertionError(
-            "Workflow must explicitly check the checked-in MANIFEST.sha256"
-        )
-    if "make validate" not in workflow_text:
-        raise AssertionError("Workflow must run make validate")
-
-    install_step = next(
-        (step for step in steps if step.get("name") == "Install Python validators"),
-        None,
-    )
-    if install_step is None:
-        raise AssertionError("Workflow is missing the Python validator install step")
-    install_run = str(install_step.get("run", ""))
-    required_install_fragments = (
-        "python -m pip install",
-        "--disable-pip-version-check",
-        "--only-binary=:all:",
-        "--require-hashes",
-        "--requirement requirements-dev.txt",
-    )
-    if not all(fragment in install_run for fragment in required_install_fragments):
-        raise AssertionError(
-            "Workflow must install validator dependencies with --only-binary=:all: and --require-hashes"
-        )
-    if "sha256sum --check --strict" not in workflow_text:
-        raise AssertionError(
-            "Workflow must verify the downloaded OPA binary digest with sha256sum --check --strict"
-        )
-    if re.search(r"uses:\s+[^\s]+@v\d+\b", workflow_text):
-        raise AssertionError("GitHub Actions must be pinned to immutable commit SHAs")
-
-
-PINNED_ACTION_SHA = re.compile(r"^[^@]+@[0-9a-f]{40}$")
-
-
-def assert_actions_are_sha_pinned(steps: list[dict[str, Any]], *, workflow: str) -> None:
-    for step in steps:
-        uses = step.get("uses")
-        if uses and not PINNED_ACTION_SHA.match(uses):
-            raise AssertionError(
-                f"{workflow} uses an action that is not pinned to a commit SHA: {uses}"
-            )
 
 
 def validate_release_workflow() -> None:
@@ -896,7 +977,7 @@ def validate_release_workflow() -> None:
 
     job = workflow.get("jobs", {}).get("release", {})
     steps = job.get("steps", [])
-    assert_actions_are_sha_pinned(steps, workflow="Release workflow")
+    validate_ci_job_hardening(job, workflow_text, workflow="Release workflow")
 
     expected_permissions = {
         "contents": "write",
@@ -921,8 +1002,7 @@ def validate_release_workflow() -> None:
 
     # Publishing an unvalidated or version-mismatched archive is the failure to prevent.
     for fragment, message in (
-        ("make validate", "Release workflow must run the full gate before publishing"),
-        ("make manifest-check", "Release workflow must verify the checked-in manifest"),
+        ("make package", "Release workflow must build the release through make package"),
         ('!= "v${version}"', "Release workflow must verify the tag matches VERSION"),
         ("--verify-tag", "Release workflow must publish with --verify-tag"),
     ):
@@ -993,6 +1073,10 @@ def validate_policy_source() -> None:
         "execution.authority_chain_verified == true",
         "execution.authority_subject_principal_id == authority_subject.principal_id",
         "execution.agent_actor_principal_id == agent.agent_principal",
+        "tool_config_valid if {",
+        'type_name(tool_config.write) == "boolean"',
+        'type_name(tool_config.requires_approval) == "boolean"',
+        'tool_config.approval_mode in {"none", "confirmation", "independent"}',
         "approval_record.agent_definition_id == agent.agent_definition_id",
         "approval_record.agent_version == agent.agent_version",
         "approval_record.runtime_instance_id == agent.runtime_instance_id",
@@ -1002,6 +1086,8 @@ def validate_policy_source() -> None:
         "approval_record.credential_profile == selected_credential_profile",
         "approval_record.single_use == true",
         "approval_record.consumed == false",
+        "approval_record.approver_principal_id != agent.agent_principal",
+        "approval_record.approver_principal_id != execution.principal_id",
         "expected_audiences_for_target",
         "execution.audiences[0] == sole_expected_audience",
         "action_canonicalizable",
@@ -1083,6 +1169,57 @@ def assert_json_match(expected: Any, actual: Any, label: str) -> None:
         )
 
 
+def validate_tool_configs(agent_control: dict[str, Any]) -> None:
+    allowed_modes = {"user_delegated", "agent_own", "brokered_service"}
+    allowed_approval_modes = {"none", "confirmation", "independent"}
+    allowed_risk_tiers = {"low", "medium", "high", "critical"}
+
+    servers = agent_control.get("servers")
+    if not isinstance(servers, dict) or not servers:
+        raise AssertionError("agent_control.servers must be a non-empty object")
+
+    for server_name, server in servers.items():
+        tools = server.get("tools") if isinstance(server, dict) else None
+        if not isinstance(tools, dict) or not tools:
+            raise AssertionError(f"Server {server_name} must define a non-empty tools object")
+
+        for tool_name, tool in tools.items():
+            label = f"Tool {server_name}/{tool_name}"
+            if not isinstance(tool, dict):
+                raise AssertionError(f"{label} configuration must be an object")
+            if type(tool.get("write")) is not bool:
+                raise AssertionError(f"{label} write must be an explicit boolean")
+            if type(tool.get("requires_approval")) is not bool:
+                raise AssertionError(
+                    f"{label} requires_approval must be an explicit boolean"
+                )
+            if tool.get("approval_mode") not in allowed_approval_modes:
+                raise AssertionError(f"{label} approval_mode is missing or invalid")
+            if tool.get("risk_tier") not in allowed_risk_tiers:
+                raise AssertionError(f"{label} risk_tier is missing or invalid")
+
+            ttl = tool.get("max_credential_ttl_seconds")
+            if type(ttl) is not int or not 1 <= ttl <= 86400:
+                raise AssertionError(
+                    f"{label} max_credential_ttl_seconds must be an integer from 1 to 86400"
+                )
+
+            profiles = tool.get("credential_profiles")
+            if not isinstance(profiles, dict) or not profiles:
+                raise AssertionError(
+                    f"{label} credential_profiles must be a non-empty object"
+                )
+            for mode, profile in profiles.items():
+                if mode not in allowed_modes:
+                    raise AssertionError(
+                        f"{label} has an unsupported credential profile mode: {mode}"
+                    )
+                if not isinstance(profile, str) or not profile:
+                    raise AssertionError(
+                        f"{label} credential profile for {mode} must be a non-empty string"
+                    )
+
+
 def validate_examples_and_policy_data() -> tuple[str, str, str, str, str, str, str]:
     validate_schema(
         "schema/authorization-context.schema.json",
@@ -1134,6 +1271,7 @@ def validate_examples_and_policy_data() -> tuple[str, str, str, str, str, str, s
         )
 
     agent_control = load_json("data/agent-control.json")["agent_control"]
+    validate_tool_configs(agent_control)
     policy_bytes = (SCRIPT_ROOT / "policy/mcp-tool-authorization.rego").read_bytes()
     expected_policy_digest = sha256_prefixed(
         b"mcp-agent-policy-bundle-v1\n"
@@ -1278,6 +1416,8 @@ def validate_examples_and_policy_data() -> tuple[str, str, str, str, str, str, s
     if approver in {
         verified["requester"]["principal_id"],
         verified["authority_subject"]["principal_id"],
+        agent["agent_principal"],
+        execution["principal_id"],
     }:
         raise AssertionError("Independent approval example is self-approved")
 
@@ -1658,6 +1798,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     verify_tree_parser.add_argument("root", nargs="?", default=".")
 
+    normalize_modes_parser = subparsers.add_parser(
+        "normalize-package-modes",
+        help="Set canonical permissions on every package file.",
+    )
+    normalize_modes_parser.add_argument("root", nargs="?", default=".")
+
     return parser
 
 
@@ -1687,6 +1833,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "verify-package-tree":
         verify_package_tree(Path(args.root).resolve())
         print(f"Package tree verified: {Path(args.root).resolve()}")
+        return 0
+
+    if args.command == "normalize-package-modes":
+        root = Path(args.root).resolve()
+        normalize_package_modes(root)
+        print(f"Package modes normalized: {root}")
         return 0
 
     return validate_source_tree(skip_manifest_check=args.skip_manifest_check)

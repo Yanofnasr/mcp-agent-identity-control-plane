@@ -120,6 +120,7 @@ The reference Rego policy denies a tool call unless all applicable controls pass
 - The final `verified.action` is reconstructed from the live invocation at the PEP and is not caller-supplied duplicate state.
 - Every SHA-256 field uses the exact `sha256:` prefix followed by 64 lowercase hexadecimal characters.
 - The method, tool, and normalized target are allowed by trusted policy data.
+- Every tool explicitly declares valid write, approval, risk, lifetime, and credential-profile controls; malformed or incomplete tool configuration fails closed.
 - Production write permission comes from trusted policy data, not request input.
 - The action hash is recomputed from the canonical action profile.
 - The execution credential issuer is trusted.
@@ -200,7 +201,7 @@ python3 -m pip install --only-binary=:all: --require-hashes -r requirements-dev.
 make validate-structure
 ```
 
-Other platforms should generate and review an equivalent platform-specific hash lock. The structural gate validates both JSON Schemas, JSON and YAML equivalence, all derived digests, approval bindings, authority-chain links, audience-to-target binding, trusted policy-data consistency, negative schema cases, the package allowlist, and package privacy.
+Other platforms should generate and review an equivalent platform-specific hash lock. The structural gate validates both JSON Schemas, JSON and YAML equivalence, all derived digests, approval bindings, authority-chain links, audience-to-target binding, every trusted tool configuration, negative schema cases, the package allowlist, and package privacy.
 
 ### Full Rego gate
 
@@ -250,7 +251,7 @@ The CI workflow pins OPA **v1.18.2** and verifies the Linux AMD64 static binary 
     "https://source-control.example.internal"
   ],
   "policy_id": "urn:example:policy:mcp-agent-tool-authorization",
-  "policy_version": "1.3.0"
+  "policy_version": "1.3.1"
 }
 ```
 
@@ -275,11 +276,12 @@ The Rego suite explicitly verifies denial for:
 - Newline-bearing canonical action fields
 - Unauthorized target
 - Untrusted issuer
-- Self-approval where independent approval is required
+- Self-approval by the requester, authority subject, agent, or execution principal where independent approval is required
 - Empty approver identity, non-single-use approval, or consumed approval
 - Approval bound to a different agent build, runtime, or execution contract
 - Approval bound to a different policy bundle
 - Missing credential profile
+- Missing or invalid write, approval, risk, lifetime, or credential-profile tool configuration
 - Production write access removed from trusted policy data
 
 ## Regenerating derived values
@@ -311,7 +313,7 @@ Create a clean archive outside the source tree:
 make package
 ```
 
-The packaging script first requires the source tree and checked-in manifest to be current. It stages only allowlisted files, regenerates derived values and diagrams inside the staging area, and fails if any generated artifact differs from source. It then creates and verifies the staged manifest, normalizes archive timestamps in UTC using the release date by default, writes a deterministic-content ZIP, unpacks it, and verifies the extracted tree against the manifest and allowlist again. Packaging never repairs or rewrites tracked source files.
+The packaging script first requires the source tree and checked-in manifest to be current. It stages only allowlisted files, regenerates derived values and diagrams inside the staging area, and fails if any generated artifact differs from source. It then assigns canonical modes (`0644` for data and `0755` for executable scripts), creates and verifies the staged manifest, normalizes archive timestamps in UTC using the release date by default, writes a deterministic ZIP, unpacks it, and verifies the extracted tree against the manifest, allowlist, and mode contract again. Packaging never repairs or rewrites tracked source files.
 
 Graphviz is required, because packaging re-renders the diagrams to prove the checked-in PNG and SVG still match their `.dot` sources. Graphviz output varies between versions, so that comparison is a local developer gate rather than a release dependency. Setting `PACKAGE_ALLOW_MISSING_GRAPHVIZ=1` skips only that comparison, which is what the release workflow does after it has already verified the checked-in manifest. The archive is byte-identical either way, because `MANIFEST.sha256` pins every shipped file.
 

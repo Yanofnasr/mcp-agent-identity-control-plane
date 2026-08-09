@@ -58,7 +58,7 @@
     "task_id": "task_01J8Y4P2TF",
     "correlation_id": "corr_01J8Y4PAP7",
     "environment": "production",
-    "policy_bundle_digest": "sha256:0de08f79736aef34cd2a5380177fef7ddbd31b9719dfbe23d583636adb23a64a"
+    "policy_bundle_digest": "sha256:2eefbd6eab6222a90ea22d3d235f892dc5762bf2d6dba52e237622942f5d0cee"
   },
   "approval": {
     "required": true,
@@ -106,7 +106,7 @@
       "https://source-control.example.internal"
     ],
     "policy_id": "urn:example:policy:mcp-agent-tool-authorization",
-    "policy_version": "1.3.0",
+    "policy_version": "1.3.1",
     "evaluated_at": "2026-07-28T12:20:02Z"
   },
   "result": {
@@ -115,7 +115,7 @@
     "completed_at": "2026-07-28T12:20:04Z"
   },
   "evidence": {
-    "record_digest": "sha256:3b40dfad4e22345a1e884fe8f5c78c1801a266305e07a8bffd8e4909bd6abb7e",
+    "record_digest": "sha256:8ab4b4d76d82b12093052671793ca1d5246dfbbd64ef1575d914dbc1fa1cabf8",
     "digest_profile": "restricted-json-sort-keys-v1",
     "evidence_uri": "https://evidence.example.internal/events/evt_01J8Y4T3T5M1A4FGKMGQ2Q6J7D",
     "retention_class": "security",
